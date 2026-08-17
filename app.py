@@ -14,7 +14,7 @@ ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 
 # LINK PÚBLICO E SENHA DO GESTOR
-URL_APP = "https://cantina-mp-bypacheco.streamlit.app/"
+URL_APP = "https://cantina-mp-bypacheco.streamlit.app"
 SENHA_GESTOR = "1234"
 
 # --- FUNÇÕES ---
@@ -117,7 +117,19 @@ if modo == "📱 Área do Cliente (Cardápio)":
                 preco_unit = float(linha_prod.get("Preco", 0.0))
 
                 qtd_pedida = st.number_input("Quantidade", min_value=1, max_value=qtd_max, value=1, key="cli_qtd")
-                forma_pagto = st.radio("Forma de Pagamento", ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pgto. Posterior"], key="cli_pagto")
+                
+                # Seleção da forma de pagamento
+                forma_pagto = st.radio(
+                    "Forma de Pagamento", 
+                    ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
+                    key="cli_pagto"
+                )
+
+                # Campo condicional para o WhatsApp no Pagamento Posterior
+                whatsapp_cliente = ""
+                if forma_pagto == "Pagamento Posterior":
+                    st.info("📌 Para a opção **Pagamento Posterior**, é obrigatório informar seu WhatsApp para controle e cobrança.")
+                    whatsapp_cliente = st.text_input("Seu WhatsApp (com DDD)", placeholder="Ex: (31) 99999-9999", key="cli_whats")
 
                 total_pedido = qtd_pedida * preco_unit
                 st.success(f"**Total a pagar:** R$ {total_pedido:.2f}")
@@ -125,8 +137,18 @@ if modo == "📱 Área do Cliente (Cardápio)":
                 if st.button("🚀 Enviar Pedido", type="primary", use_container_width=True):
                     if not nome_cliente.strip():
                         st.warning("Por favor, digite seu nome antes de enviar.")
+                    elif forma_pagto == "Pagamento Posterior" and not whatsapp_cliente.strip():
+                        st.warning("Por favor, digite seu WhatsApp para prosseguir com o Pagamento Posterior.")
                     else:
-                        identificacao = f"{nome_cliente.strip()} ({mesa_ou_local.strip()})" if mesa_ou_local.strip() else nome_cliente.strip()
+                        info_extra = []
+                        if mesa_ou_local.strip():
+                            info_extra.append(mesa_ou_local.strip())
+                        if whatsapp_cliente.strip():
+                            info_extra.append(f"Whats: {whatsapp_cliente.strip()}")
+
+                        detalhe_cliente = f" ({', '.join(info_extra)})" if info_extra else ""
+                        identificacao = f"{nome_cliente.strip()}{detalhe_cliente}"
+
                         novo_id = int(datetime.now().timestamp())
                         registro = {
                             "ID": novo_id,
@@ -243,7 +265,12 @@ else:
                 preco_unitario = float(linha_prod.get("Preco", 0.0))
                 
                 qtd_saida = st.number_input("Quantidade", min_value=1, max_value=qtd_atual if qtd_atual > 0 else 1, value=1, key="balcao_qtd")
-                forma_pagamento = st.radio("Pagamento", ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pgto. Posterior"], horizontal=True, key="balcao_pagto")
+                forma_pagamento = st.radio(
+                    "Pagamento", 
+                    ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
+                    horizontal=True, 
+                    key="balcao_pagto"
+                )
                 
                 valor_total = qtd_saida * preco_unitario
                 st.info(f"**Total:** R$ {valor_total:.2f}")
