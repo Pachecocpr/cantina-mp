@@ -15,9 +15,9 @@ ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 
 # LINK PÚBLICO E SENHA DO GESTOR
 URL_APP = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
-SENHA_GESTOR = "1234"  # <-- Altere aqui para a sua senha desejada!
+SENHA_GESTOR = "1234"
 
-# --- FUNÇÕES DE DADOS E QR CODE ---
+# --- FUNÇÕES ---
 
 def gerar_qrcode(url):
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
@@ -89,7 +89,7 @@ if "df" not in st.session_state:
 st.title("🍔 Gestão da Cantina")
 
 # Navegação lateral
-modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)"])
+modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)", "📲 Gerar QR Code"])
 
 # --- VISÃO 1: ÁREA DO CLIENTE ---
 if modo == "📱 Área do Cliente (Cardápio)":
@@ -149,24 +149,36 @@ if modo == "📱 Área do Cliente (Cardápio)":
                 use_container_width=True
             )
 
-# --- VISÃO 2: ÁREA DA CANTINA (RESTRITA POR SENHA) ---
+# --- VISÃO 2: GERADOR DE QR CODE ---
+elif modo == "📲 Gerar QR Code":
+    st.header("📲 QR Code para Acesso Rápido")
+    st.write("Exiba ou imprima este QR Code para que os clientes abram o cardápio no celular.")
+    
+    qr_bytes = gerar_qrcode(URL_APP)
+    st.image(qr_bytes, caption="Escaneie para fazer seu pedido", width=250)
+    st.download_button(
+        label="📥 Baixar Imagem do QR Code",
+        data=qr_bytes,
+        file_name="qrcode_cantina.png",
+        mime="image/png"
+    )
+
+# --- VISÃO 3: ÁREA DA CANTINA (COM SENHA) ---
 else:
     st.sidebar.divider()
     senha_digitada = st.sidebar.text_input("Senha do Gestor:", type="password")
 
     if senha_digitada == SENHA_GESTOR:
-        # Alerta de estoque
         produtos_baixos = st.session_state.df[st.session_state.df["Estoque"] <= st.session_state.df["Minimo_Recomendado"]]
         if not produtos_baixos.empty:
             lista_alertas = ", ".join([f"**{row['Produto']}** ({row['Estoque']} un / mín {row['Minimo_Recomendado']})" for _, row in produtos_baixos.iterrows()])
             st.error(f"🚨 **ESTOQUE CRÍTICO:** {lista_alertas}", icon="⚠️")
 
-        aba_aprovacao, aba_balcao, aba_gestao, aba_historico, aba_qrcode = st.tabs([
+        aba_aprovacao, aba_balcao, aba_gestao, aba_historico = st.tabs([
             "🔔 Pedidos Recebidos",
             "🛒 Venda Balcão",
             "⚙️ Gestão de Estoque",
-            "📊 Histórico de Vendas",
-            "📲 QR Code do App"
+            "📊 Histórico de Vendas"
         ])
 
         with aba_aprovacao:
@@ -278,7 +290,7 @@ else:
                                 st.session_state.df = pd.concat([st.session_state.df, nova_linha], ignore_index=True)
                             
                             salvar_estoque(st.session_state.df)
-                            st.success("Produto salvo com sucesso!")
+                            st.success("Produto salvo!")
                             st.rerun()
 
             with col_exc:
@@ -306,18 +318,5 @@ else:
                     st.rerun()
             else:
                 st.info("Nenhuma venda realizada até o momento.")
-
-        with aba_qrcode:
-            st.header("📲 QR Code para Clientes")
-            st.write("Imprima ou exiba o QR Code abaixo para que os clientes façam pedidos com o celular.")
-            
-            qr_bytes = gerar_qrcode(URL_APP)
-            st.image(qr_bytes, caption="Escaneie para acessar o Cardápio", width=250)
-            st.download_button(
-                label="📥 Baixar QR Code (PNG)",
-                data=qr_bytes,
-                file_name="qrcode_cantina.png",
-                mime="image/png"
-            )
     else:
         st.warning("🔒 Digite a senha na barra lateral para acessar o painel da cantina.")
