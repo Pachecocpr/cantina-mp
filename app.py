@@ -14,7 +14,7 @@ ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 
 # LINK PÚBLICO E SENHA DO GESTOR
-URL_APP = "https://cantina-mp-bypacheco.streamlit.app"
+URL_APP = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
 SENHA_GESTOR = "1234"
 
 # --- FUNÇÕES ---
@@ -89,7 +89,7 @@ def limpar_vendas():
 if "df" not in st.session_state:
     st.session_state.df = carregar_estoque()
 
-st.title("🍔 CANTINA - MIN. DA FAMÍLIA")
+st.title("🍔 CANTINA - MINISTÉRIO DA FAMÍLIA 👨‍👩‍👧‍👦")
 
 # Navegação lateral
 modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)", "📲 Gerar QR Code"])
@@ -106,6 +106,8 @@ if modo == "📱 Área do Cliente (Cardápio)":
 
     if df_estoque_atual.empty:
         st.error("Desculpe, não há produtos cadastrados no cardápio no momento!")
+        if st.button("🔄 Recarregar Página"):
+            st.rerun()
     else:
         # 2. Calcula reservas de estoque resultantes de pedidos pendentes
         pedidos_pendentes = df_pedidos_atuais[df_pedidos_atuais["Status"] == "Pendente"]
@@ -116,11 +118,14 @@ if modo == "📱 Área do Cliente (Cardápio)":
         df_cardapio["Estoque_Reservado"] = df_cardapio["Produto"].map(reservas).fillna(0).astype(int)
         df_cardapio["Estoque_Disponivel"] = df_cardapio["Estoque"] - df_cardapio["Estoque_Reservado"]
 
-        # 4. Filtra somente itens com estoque real disponível
+        # 4. Filtra somente itens com estoque real disponível (> 0)
         df_disponiveis = df_cardapio[df_cardapio["Estoque_Disponivel"] > 0]
 
         if df_disponiveis.empty:
-            st.error("Desculpe, todos os produtos estão temporariamente esgotados ou já foram reservados!")
+            st.error("⚠️ Todos os produtos do cardápio estão temporariamente esgotados ou já foram reservados!")
+            st.info("Aguarde alguns minutos ou clique abaixo para verificar novamente se novos itens foram liberados.")
+            if st.button("🔄 Atualizar Cardápio", type="primary", use_container_width=True):
+                st.rerun()
         else:
             col_c1, col_c2 = st.columns([1, 1])
 
@@ -133,11 +138,16 @@ if modo == "📱 Área do Cliente (Cardápio)":
                 produto_pedid = st.selectbox("Selecione o Produto", produtos_disponiveis, key="cli_prod")
                 linha_prod = df_disponiveis[df_disponiveis["Produto"] == produto_pedid].iloc[0]
                 
-                # O limite máximo a pedir é exatamente o Estoque Disponível Real
                 qtd_max = int(linha_prod["Estoque_Disponivel"])
                 preco_unit = float(linha_prod.get("Preco", 0.0))
 
-                qtd_pedida = st.number_input("Quantidade", min_value=1, max_value=qtd_max, value=1, key="cli_qtd")
+                qtd_pedida = st.number_input(
+                    f"Quantidade (Disponível: {qtd_max})", 
+                    min_value=1, 
+                    max_value=max(1, qtd_max), 
+                    value=1, 
+                    key="cli_qtd"
+                )
                 
                 forma_pagto = st.radio(
                     "Forma de Pagamento", 
@@ -154,7 +164,7 @@ if modo == "📱 Área do Cliente (Cardápio)":
                     elif not celular_cliente.strip():
                         st.warning("⚠️ É obrigatório informar seu Celular/WhatsApp para enviar o pedido!")
                     else:
-                        # Re-validação de segurança no momento do clique (evita concorrência)
+                        # Re-validação em tempo de clique
                         df_pedidos_checagem = carregar_pedidos()
                         pedidos_pend_checagem = df_pedidos_checagem[df_pedidos_checagem["Status"] == "Pendente"]
                         reserva_atual = pedidos_pend_checagem[pedidos_pend_checagem["Produto"] == produto_pedid]["Quantidade"].sum() if not pedidos_pend_checagem.empty else 0
@@ -163,8 +173,10 @@ if modo == "📱 Área do Cliente (Cardápio)":
                         disp_momento = estoque_fisico - reserva_atual
 
                         if qtd_pedida > disp_momento:
-                            st.error(f"⚠️ Ops! Não temos essa quantidade disponível no momento. Restam apenas {disp_momento} unidades.")
-                            st.rerun()
+                            st.error(f"⚠️ Ops! Apenas {disp_momento} unidades de '{produto_pedid}' continuam disponíveis.")
+                            st.warning("O cardápio será atualizado para você continuar.")
+                            if st.button("🔄 Entendido, Voltar ao Cardápio", type="primary"):
+                                st.rerun()
                         else:
                             identificacao = f"{nome_cliente.strip()} (Tel: {celular_cliente.strip()})"
                             novo_id = int(datetime.now().timestamp())
@@ -181,12 +193,15 @@ if modo == "📱 Área do Cliente (Cardápio)":
                             salvar_pedido_pendente(registro)
                             st.balloons()
                             st.success("✅ Pedido enviado com sucesso! Aguarde a confirmação da cantina.")
-                            st.rerun()
+                            if st.button("➕ Fazer Outro Pedido", type="primary", use_container_width=True):
+                                st.rerun()
 
             with col_c2:
                 st.subheader("Cardápio Disponível")
                 st.dataframe(
-                    df_disponiveis[["Produto", "Preco"]].rename(columns={"Preco": "Preço (R$)"}),
+                    df_disponiveis[["Produto", "Preco", "Estoque_Disponivel"]].rename(
+                        columns={"Preco": "Preço (R$)", "Estoque_Disponivel": "Disponível"}
+                    ),
                     use_container_width=True,
                     hide_index=True
                 )
