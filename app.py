@@ -102,8 +102,9 @@ if modo == "📱 Área do Cliente (Cardápio)":
         col_c1, col_c2 = st.columns([1, 1])
 
         with col_c1:
-            nome_cliente = st.text_input("Seu Nome", placeholder="Ex: João Silva")
-            mesa_ou_local = st.text_input("Mesa / Localização (Opcional)", placeholder="Ex: Mesa 04 ou Sala 10")
+            nome_cliente = st.text_input("Seu Nome *", placeholder="Ex: João Silva")
+            # CAMPO OBRIGATÓRIO DE CELULAR/WHATSAPP
+            celular_cliente = st.text_input("Celular / WhatsApp (com DDD) *", placeholder="Ex: (31) 99999-9999")
             
             produtos_disponiveis = st.session_state.df[st.session_state.df["Estoque"] > 0]["Produto"].tolist()
 
@@ -118,36 +119,23 @@ if modo == "📱 Área do Cliente (Cardápio)":
 
                 qtd_pedida = st.number_input("Quantidade", min_value=1, max_value=qtd_max, value=1, key="cli_qtd")
                 
-                # Seleção da forma de pagamento
                 forma_pagto = st.radio(
                     "Forma de Pagamento", 
                     ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
                     key="cli_pagto"
                 )
 
-                # Campo condicional para o WhatsApp no Pagamento Posterior
-                whatsapp_cliente = ""
-                if forma_pagto == "Pagamento Posterior":
-                    st.info("📌 Para a opção **Pagamento Posterior**, é obrigatório informar seu WhatsApp para controle e cobrança.")
-                    whatsapp_cliente = st.text_input("Seu WhatsApp (com DDD)", placeholder="Ex: (31) 99999-9999", key="cli_whats")
-
                 total_pedido = qtd_pedida * preco_unit
                 st.success(f"**Total a pagar:** R$ {total_pedido:.2f}")
 
                 if st.button("🚀 Enviar Pedido", type="primary", use_container_width=True):
+                    # VALIDAÇÃO OBRIGATÓRIA DE NOME E CELULAR
                     if not nome_cliente.strip():
-                        st.warning("Por favor, digite seu nome antes de enviar.")
-                    elif forma_pagto == "Pagamento Posterior" and not whatsapp_cliente.strip():
-                        st.warning("Por favor, digite seu WhatsApp para prosseguir com o Pagamento Posterior.")
+                        st.warning("⚠️ Por favor, digite seu nome antes de enviar.")
+                    elif not celular_cliente.strip():
+                        st.warning("⚠️ É obrigatório informar seu Celular/WhatsApp para enviar o pedido!")
                     else:
-                        info_extra = []
-                        if mesa_ou_local.strip():
-                            info_extra.append(mesa_ou_local.strip())
-                        if whatsapp_cliente.strip():
-                            info_extra.append(f"Whats: {whatsapp_cliente.strip()}")
-
-                        detalhe_cliente = f" ({', '.join(info_extra)})" if info_extra else ""
-                        identificacao = f"{nome_cliente.strip()}{detalhe_cliente}"
+                        identificacao = f"{nome_cliente.strip()} (Tel: {celular_cliente.strip()})"
 
                         novo_id = int(datetime.now().timestamp())
                         registro = {
