@@ -117,7 +117,7 @@ if modo == "📱 Área do Cliente (Cardápio)":
                 preco_unit = float(linha_prod.get("Preco", 0.0))
 
                 qtd_pedida = st.number_input("Quantidade", min_value=1, max_value=qtd_max, value=1, key="cli_qtd")
-                forma_pagto = st.radio("Forma de Pagamento", ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito"], key="cli_pagto")
+                forma_pagto = st.radio("Forma de Pagamento", ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pgto. Posterior"], key="cli_pagto")
 
                 total_pedido = qtd_pedida * preco_unit
                 st.success(f"**Total a pagar:** R$ {total_pedido:.2f}")
