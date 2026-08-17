@@ -96,67 +96,67 @@ if modo == "📱 Área do Cliente (Cardápio)":
     st.header("📱 Cardápio Digital - Faça seu Pedido")
     st.caption("Preencha as informações abaixo para enviar seu pedido para o balcão.")
 
-    if st.session_state.df.empty:
-        st.warning("Nenhum produto disponível no momento.")
+    # Filtrar produtos com estoque > 0
+    df_disponiveis = st.session_state.df[st.session_state.df["Estoque"] > 0]
+
+    if df_disponiveis.empty:
+        st.error("Desculpe, todos os produtos estão esgotados no momento!")
     else:
         col_c1, col_c2 = st.columns([1, 1])
 
         with col_c1:
             nome_cliente = st.text_input("Seu Nome *", placeholder="Ex: João Silva")
-            # CAMPO OBRIGATÓRIO DE CELULAR/WHATSAPP
             celular_cliente = st.text_input("Celular / WhatsApp (com DDD) *", placeholder="Ex: (31) 99999-9999")
             
-            produtos_disponiveis = st.session_state.df[st.session_state.df["Estoque"] > 0]["Produto"].tolist()
+            produtos_disponiveis = df_disponiveis["Produto"].tolist()
 
-            if not produtos_disponiveis:
-                st.error("Desculpe, todos os produtos estão esgotados!")
-            else:
-                produto_pedid = st.selectbox("Selecione o Produto", produtos_disponiveis, key="cli_prod")
-                linha_prod = st.session_state.df[st.session_state.df["Produto"] == produto_pedid].iloc[0]
-                
-                qtd_max = int(linha_prod["Estoque"])
-                preco_unit = float(linha_prod.get("Preco", 0.0))
+            produto_pedid = st.selectbox("Selecione o Produto", produtos_disponiveis, key="cli_prod")
+            linha_prod = df_disponiveis[df_disponiveis["Produto"] == produto_pedid].iloc[0]
+            
+            qtd_max = int(linha_prod["Estoque"])
+            preco_unit = float(linha_prod.get("Preco", 0.0))
 
-                qtd_pedida = st.number_input("Quantidade", min_value=1, max_value=qtd_max, value=1, key="cli_qtd")
-                
-                forma_pagto = st.radio(
-                    "Forma de Pagamento", 
-                    ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
-                    key="cli_pagto"
-                )
+            qtd_pedida = st.number_input("Quantidade", min_value=1, max_value=qtd_max, value=1, key="cli_qtd")
+            
+            forma_pagto = st.radio(
+                "Forma de Pagamento", 
+                ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
+                key="cli_pagto"
+            )
 
-                total_pedido = qtd_pedida * preco_unit
-                st.success(f"**Total a pagar:** R$ {total_pedido:.2f}")
+            total_pedido = qtd_pedida * preco_unit
+            st.success(f"**Total a pagar:** R$ {total_pedido:.2f}")
 
-                if st.button("🚀 Enviar Pedido", type="primary", use_container_width=True):
-                    # VALIDAÇÃO OBRIGATÓRIA DE NOME E CELULAR
-                    if not nome_cliente.strip():
-                        st.warning("⚠️ Por favor, digite seu nome antes de enviar.")
-                    elif not celular_cliente.strip():
-                        st.warning("⚠️ É obrigatório informar seu Celular/WhatsApp para enviar o pedido!")
-                    else:
-                        identificacao = f"{nome_cliente.strip()} (Tel: {celular_cliente.strip()})"
+            if st.button("🚀 Enviar Pedido", type="primary", use_container_width=True):
+                if not nome_cliente.strip():
+                    st.warning("⚠️ Por favor, digite seu nome antes de enviar.")
+                elif not celular_cliente.strip():
+                    st.warning("⚠️ É obrigatório informar seu Celular/WhatsApp para enviar o pedido!")
+                else:
+                    identificacao = f"{nome_cliente.strip()} (Tel: {celular_cliente.strip()})"
 
-                        novo_id = int(datetime.now().timestamp())
-                        registro = {
-                            "ID": novo_id,
-                            "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "Cliente": identificacao,
-                            "Produto": produto_pedid,
-                            "Quantidade": qtd_pedida,
-                            "Valor_Total": round(total_pedido, 2),
-                            "Forma_Pagamento": forma_pagto,
-                            "Status": "Pendente"
-                        }
-                        salvar_pedido_pendente(registro)
-                        st.balloons()
-                        st.success("✅ Pedido enviado com sucesso! Aguarde a confirmação da cantina.")
+                    novo_id = int(datetime.now().timestamp())
+                    registro = {
+                        "ID": novo_id,
+                        "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Cliente": identificacao,
+                        "Produto": produto_pedid,
+                        "Quantidade": qtd_pedida,
+                        "Valor_Total": round(total_pedido, 2),
+                        "Forma_Pagamento": forma_pagto,
+                        "Status": "Pendente"
+                    }
+                    salvar_pedido_pendente(registro)
+                    st.balloons()
+                    st.success("✅ Pedido enviado com sucesso! Aguarde a confirmação da cantina.")
 
         with col_c2:
-            st.subheader("Cardápio")
+            st.subheader("Cardápio Disponível")
+            # Exibe na tabela apenas produtos que possuem estoque maior que zero
             st.dataframe(
-                st.session_state.df[["Produto", "Preco"]].rename(columns={"Preco": "Preço (R$)"}),
-                use_container_width=True
+                df_disponiveis[["Produto", "Preco"]].rename(columns={"Preco": "Preço (R$)"}),
+                use_container_width=True,
+                hide_index=True
             )
 
 # --- VISÃO 2: GERADOR DE QR CODE ---
