@@ -130,35 +130,37 @@ if modo == "📱 Área do Cliente (Cardápio)":
             col_c1, col_c2 = st.columns([1, 1])
 
             with col_c1:
-                nome_cliente = st.text_input("Seu Nome *", placeholder="Ex: João Silva")
-                celular_cliente = st.text_input("Celular / WhatsApp (com DDD) *", placeholder="Ex: (31) 99999-9999")
-                
-                produtos_disponiveis = df_disponiveis["Produto"].tolist()
+                with st.form("form_pedido_cliente", clear_on_submit=True):
+                    nome_cliente = st.text_input("Seu Nome *", placeholder="Ex: João Silva")
+                    celular_cliente = st.text_input("Celular / WhatsApp (com DDD) *", placeholder="Ex: (31) 99999-9999")
+                    
+                    produtos_disponiveis = df_disponiveis["Produto"].tolist()
+                    produto_pedid = st.selectbox("Selecione o Produto", produtos_disponiveis, key="cli_prod")
+                    
+                    linha_prod = df_disponiveis[df_disponiveis["Produto"] == produto_pedid].iloc[0]
+                    qtd_max = int(linha_prod["Estoque_Disponivel"])
+                    preco_unit = float(linha_prod.get("Preco", 0.0))
 
-                produto_pedid = st.selectbox("Selecione o Produto", produtos_disponiveis, key="cli_prod")
-                linha_prod = df_disponiveis[df_disponiveis["Produto"] == produto_pedid].iloc[0]
-                
-                qtd_max = int(linha_prod["Estoque_Disponivel"])
-                preco_unit = float(linha_prod.get("Preco", 0.0))
+                    qtd_pedida = st.number_input(
+                        f"Quantidade (Disponível: {qtd_max})", 
+                        min_value=1, 
+                        max_value=max(1, qtd_max), 
+                        value=1, 
+                        key="cli_qtd"
+                    )
+                    
+                    forma_pagto = st.radio(
+                        "Forma de Pagamento", 
+                        ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
+                        key="cli_pagto"
+                    )
 
-                qtd_pedida = st.number_input(
-                    f"Quantidade (Disponível: {qtd_max})", 
-                    min_value=1, 
-                    max_value=max(1, qtd_max), 
-                    value=1, 
-                    key="cli_qtd"
-                )
-                
-                forma_pagto = st.radio(
-                    "Forma de Pagamento", 
-                    ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
-                    key="cli_pagto"
-                )
+                    total_pedido = qtd_pedida * preco_unit
+                    st.info(f"**Total a pagar:** R$ {total_pedido:.2f}")
 
-                total_pedido = qtd_pedida * preco_unit
-                st.success(f"**Total a pagar:** R$ {total_pedido:.2f}")
+                    btn_enviar = st.form_submit_button("🚀 Enviar Pedido", type="primary", use_container_width=True)
 
-                if st.button("🚀 Enviar Pedido", type="primary", use_container_width=True):
+                if btn_enviar:
                     if not nome_cliente.strip():
                         st.warning("⚠️ Por favor, digite seu nome antes de enviar.")
                     elif not celular_cliente.strip():
@@ -174,9 +176,7 @@ if modo == "📱 Área do Cliente (Cardápio)":
 
                         if qtd_pedida > disp_momento:
                             st.error(f"⚠️ Ops! Apenas {disp_momento} unidades de '{produto_pedid}' continuam disponíveis.")
-                            st.warning("O cardápio será atualizado para você continuar.")
-                            if st.button("🔄 Entendido, Voltar ao Cardápio", type="primary"):
-                                st.rerun()
+                            st.warning("O cardápio foi atualizado. Por favor, tente novamente com uma quantidade menor.")
                         else:
                             identificacao = f"{nome_cliente.strip()} (Tel: {celular_cliente.strip()})"
                             novo_id = int(datetime.now().timestamp())
@@ -193,8 +193,6 @@ if modo == "📱 Área do Cliente (Cardápio)":
                             salvar_pedido_pendente(registro)
                             st.balloons()
                             st.success("✅ Pedido enviado com sucesso! Aguarde a confirmação da cantina.")
-                            if st.button("➕ Fazer Outro Pedido", type="primary", use_container_width=True):
-                                st.rerun()
 
             with col_c2:
                 st.subheader("Cardápio Disponível")
