@@ -86,7 +86,7 @@ def limpar_vendas():
 if "df" not in st.session_state:
     st.session_state.df = carregar_estoque()
 
-st.title("🍔 Gestão da Cantina")
+st.title("🍔 CANTINA - MINISTÉRIO DA FAMÍLIA")
 
 # Navegação lateral
 modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)", "📲 Gerar QR Code"])
