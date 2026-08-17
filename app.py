@@ -14,7 +14,7 @@ ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 
 # LINK PÚBLICO E SENHA DO GESTOR
-URL_APP = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
+URL_APP = "https://cantina-mp-bypacheco.streamlit.app"
 SENHA_GESTOR = "1234"
 
 # --- FUNÇÕES ---
