@@ -243,7 +243,7 @@ else:
                 preco_unitario = float(linha_prod.get("Preco", 0.0))
                 
                 qtd_saida = st.number_input("Quantidade", min_value=1, max_value=qtd_atual if qtd_atual > 0 else 1, value=1, key="balcao_qtd")
-                forma_pagamento = st.radio("Pagamento", ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito"], horizontal=True, key="balcao_pagto")
+                forma_pagamento = st.radio("Pagamento", ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pgto. Posterior"], horizontal=True, key="balcao_pagto")
                 
                 valor_total = qtd_saida * preco_unitario
                 st.info(f"**Total:** R$ {valor_total:.2f}")
