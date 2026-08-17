@@ -14,7 +14,7 @@ ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 
 # LINK PÚBLICO E SENHA DO GESTOR
-URL_APP = "https://cantina-mp-bypacheco.streamlit.app"
+URL_APP = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
 SENHA_GESTOR = "1234"
 
 # --- FUNÇÕES ---
@@ -79,14 +79,17 @@ def atualizar_pedidos_pendentes(df_pedidos):
     df_pedidos.to_csv(ARQUIVO_PEDIDOS, index=False)
 
 def limpar_vendas():
-    df_vazio = pd.DataFrame(columns=["Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento"])
-    df_vazio.to_csv(ARQUIVO_VENDAS, index=False)
+    df_vazio_vendas = pd.DataFrame(columns=["Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento"])
+    df_vazio_vendas.to_csv(ARQUIVO_VENDAS, index=False)
+    
+    df_vazio_pedidos = pd.DataFrame(columns=["ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento", "Status"])
+    df_vazio_pedidos.to_csv(ARQUIVO_PEDIDOS, index=False)
 
 # Inicializa sessão
 if "df" not in st.session_state:
     st.session_state.df = carregar_estoque()
 
-st.title("🍔 CANTINA - MINISTÉRIO DA FAMÍLIA")
+st.title("🍔 Gestão da Cantina")
 
 # Navegação lateral
 modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)", "📲 Gerar QR Code"])
@@ -96,7 +99,6 @@ if modo == "📱 Área do Cliente (Cardápio)":
     st.header("📱 Cardápio Digital - Faça seu Pedido")
     st.caption("Preencha as informações abaixo para enviar seu pedido para o balcão.")
 
-    # Filtrar produtos com estoque > 0
     df_disponiveis = st.session_state.df[st.session_state.df["Estoque"] > 0]
 
     if df_disponiveis.empty:
@@ -152,7 +154,6 @@ if modo == "📱 Área do Cliente (Cardápio)":
 
         with col_c2:
             st.subheader("Cardápio Disponível")
-            # Exibe na tabela apenas produtos que possuem estoque maior que zero
             st.dataframe(
                 df_disponiveis[["Produto", "Preco"]].rename(columns={"Preco": "Preço (R$)"}),
                 use_container_width=True,
@@ -328,9 +329,14 @@ else:
                 st.dataframe(df_vendas.sort_index(ascending=False), use_container_width=True)
                 
                 st.divider()
-                if st.button("Limpar Histórico") and st.checkbox("Tenho certeza"):
-                    limpar_vendas()
-                    st.rerun()
+                confirmar_limpeza = st.checkbox("Marque para confirmar a exclusão de todo o histórico")
+                if st.button("🗑️ Limpar Histórico de Vendas", type="primary"):
+                    if confirmar_limpeza:
+                        limpar_vendas()
+                        st.success("Histórico apagado com sucesso!")
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ Você precisa marcar a caixinha de confirmação antes de limpar.")
             else:
                 st.info("Nenhuma venda realizada até o momento.")
     else:
