@@ -1,19 +1,33 @@
 import streamlit as st
 import pandas as pd
 import os
+import qrcode
+from io import BytesIO
 from datetime import datetime
 
 # Configuração da página
 st.set_page_config(page_title="Cantina - Pedidos e Estoque", page_icon="🍔", layout="wide")
 
+# Arquivos de dados
 ARQUIVO_ESTOQUE = "estoque_cantina.csv"
 ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 
-# SENHA DE ACESSO DO GESTOR
-SENHA_GESTOR = "1234"  # <-- Altere aqui para a senha que desejar!
+# LINK PÚBLICO E SENHA DO GESTOR
+URL_APP = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
+SENHA_GESTOR = "1234"  # <-- Altere aqui para a sua senha desejada!
 
-# --- FUNÇÕES DE DADOS ---
+# --- FUNÇÕES DE DADOS E QR CODE ---
+
+def gerar_qrcode(url):
+    qr = qrcode.QRCode(version=1, box_size=10, border=2)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
 def carregar_estoque():
     if os.path.exists(ARQUIVO_ESTOQUE):
         df = pd.read_csv(ARQUIVO_ESTOQUE)
@@ -72,15 +86,16 @@ def limpar_vendas():
 if "df" not in st.session_state:
     st.session_state.df = carregar_estoque()
 
-st.title("🍔 Gestão da Cantina e Pedidos Online")
+st.title("🍔 Gestão da Cantina")
 
-# Menu na barra lateral (Sidebar)
-modo = st.sidebar.radio("Selecione o Acesso:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)"])
+# Navegação lateral
+modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)"])
 
-# --- VISÃO DO CLIENTE ---
+# --- VISÃO 1: ÁREA DO CLIENTE ---
 if modo == "📱 Área do Cliente (Cardápio)":
     st.header("📱 Cardápio Digital - Faça seu Pedido")
-    
+    st.caption("Preencha as informações abaixo para enviar seu pedido para o balcão.")
+
     if st.session_state.df.empty:
         st.warning("Nenhum produto disponível no momento.")
     else:
@@ -88,7 +103,7 @@ if modo == "📱 Área do Cliente (Cardápio)":
 
         with col_c1:
             nome_cliente = st.text_input("Seu Nome", placeholder="Ex: João Silva")
-            mesa_ou_local = st.text_input("Mesa / Local de Entrega", placeholder="Ex: Mesa 04")
+            mesa_ou_local = st.text_input("Mesa / Localização (Opcional)", placeholder="Ex: Mesa 04 ou Sala 10")
             
             produtos_disponiveis = st.session_state.df[st.session_state.df["Estoque"] > 0]["Produto"].tolist()
 
@@ -134,28 +149,29 @@ if modo == "📱 Área do Cliente (Cardápio)":
                 use_container_width=True
             )
 
-# --- VISÃO DA CANTINA (COM SENHA) ---
+# --- VISÃO 2: ÁREA DA CANTINA (RESTRITA POR SENHA) ---
 else:
     st.sidebar.divider()
-    senha_digitada = st.sidebar.text_input("Digite a Senha do Gestor:", type="password")
+    senha_digitada = st.sidebar.text_input("Senha do Gestor:", type="password")
 
     if senha_digitada == SENHA_GESTOR:
-        # Alerta de estoque crítico
+        # Alerta de estoque
         produtos_baixos = st.session_state.df[st.session_state.df["Estoque"] <= st.session_state.df["Minimo_Recomendado"]]
         if not produtos_baixos.empty:
             lista_alertas = ", ".join([f"**{row['Produto']}** ({row['Estoque']} un / mín {row['Minimo_Recomendado']})" for _, row in produtos_baixos.iterrows()])
-            st.error(f"🚨 **ATENÇÃO! ESTOQUE CRÍTICO / MÍNIMO:** {lista_alertas}", icon="⚠️")
+            st.error(f"🚨 **ESTOQUE CRÍTICO:** {lista_alertas}", icon="⚠️")
 
-        aba_aprovacao, aba_balcao, aba_gestao, aba_historico = st.tabs([
+        aba_aprovacao, aba_balcao, aba_gestao, aba_historico, aba_qrcode = st.tabs([
             "🔔 Pedidos Recebidos",
             "🛒 Venda Balcão",
             "⚙️ Gestão de Estoque",
-            "📊 Histórico de Vendas"
+            "📊 Histórico de Vendas",
+            "📲 QR Code do App"
         ])
 
         with aba_aprovacao:
-            st.header("🔔 Pedidos Recebidos")
-            if st.button("🔄 Atualizar Pedidos"):
+            st.header("🔔 Pedidos Recebidos dos Clientes")
+            if st.button("🔄 Atualizar Lista de Pedidos"):
                 st.rerun()
 
             df_pedidos = carregar_pedidos()
@@ -169,7 +185,7 @@ else:
                         col_info, col_b1, col_b2 = st.columns([3, 1, 1])
 
                         with col_info:
-                            st.write(f"**Produto:** {pedido['Quantidade']}x {pedido['Produto']}")
+                            st.write(f"**Item:** {pedido['Quantidade']}x {pedido['Produto']}")
                             st.write(f"**Pagamento:** {pedido['Forma_Pagamento']}")
 
                         with col_b1:
@@ -204,18 +220,18 @@ else:
                                 st.rerun()
 
         with aba_balcao:
-            st.header("Venda Balcão")
+            st.header("🛒 Registrar Venda no Balcão")
             col1, col2 = st.columns([1, 2])
             with col1:
                 produtos_disponiveis = st.session_state.df["Produto"].tolist()
-                produto_selecionado = st.selectbox("Selecione o Produto", produtos_disponiveis, key="balcao_prod")
+                produto_selecionado = st.selectbox("Produto", produtos_disponiveis, key="balcao_prod")
                 
                 linha_prod = st.session_state.df[st.session_state.df["Produto"] == produto_selecionado].iloc[0]
                 qtd_atual = int(linha_prod["Estoque"])
                 preco_unitario = float(linha_prod.get("Preco", 0.0))
                 
                 qtd_saida = st.number_input("Quantidade", min_value=1, max_value=qtd_atual if qtd_atual > 0 else 1, value=1, key="balcao_qtd")
-                forma_pagamento = st.radio("Forma de Pagamento", ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito"], horizontal=True, key="balcao_pagto")
+                forma_pagamento = st.radio("Pagamento", ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito"], horizontal=True, key="balcao_pagto")
                 
                 valor_total = qtd_saida * preco_unitario
                 st.info(f"**Total:** R$ {valor_total:.2f}")
@@ -227,29 +243,30 @@ else:
                         
                         salvar_venda_confirmada({
                             "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "Cliente": "Venda no Balcão",
+                            "Cliente": "Venda Balcão",
                             "Produto": produto_selecionado,
                             "Quantidade": qtd_saida,
                             "Valor_Total": round(valor_total, 2),
                             "Forma_Pagamento": forma_pagamento
                         })
-                        st.success("Venda registrada!")
+                        st.success("Venda realizada!")
                         st.rerun()
 
             with col2:
+                st.subheader("Estoque Atual")
                 st.dataframe(st.session_state.df, use_container_width=True)
 
         with aba_gestao:
-            st.header("Gestão de Estoque")
+            st.header("⚙️ Gestão de Produtos")
             col_cad, col_exc = st.columns([2, 1])
             with col_cad:
                 with st.form("form_produto"):
                     novo_nome = st.text_input("Nome do Produto")
-                    nova_qtd = st.number_input("Quantidade em Estoque", min_value=0, value=10)
+                    nova_qtd = st.number_input("Estoque Atual", min_value=0, value=10)
                     novo_min = st.number_input("Estoque Mínimo", min_value=0, value=5)
-                    novo_preco = st.number_input("Preço (R$)", min_value=0.0, value=5.00, step=0.50)
+                    novo_preco = st.number_input("Preço Unitário (R$)", min_value=0.0, value=5.00, step=0.50)
                         
-                    if st.form_submit_button("Salvar Produto"):
+                    if st.form_submit_button("Salvar / Atualizar Produto"):
                         if novo_nome.strip() != "":
                             nome_limpo = novo_nome.strip().capitalize()
                             if nome_limpo in st.session_state.df["Produto"].values:
@@ -261,7 +278,7 @@ else:
                                 st.session_state.df = pd.concat([st.session_state.df, nova_linha], ignore_index=True)
                             
                             salvar_estoque(st.session_state.df)
-                            st.success("Salvo!")
+                            st.success("Produto salvo com sucesso!")
                             st.rerun()
 
             with col_exc:
@@ -277,16 +294,30 @@ else:
             st.dataframe(st.session_state.df, use_container_width=True)
 
         with aba_historico:
-            st.header("Histórico de Vendas")
+            st.header("📊 Histórico de Vendas")
             df_vendas = carregar_vendas()
             if not df_vendas.empty:
                 st.metric("Faturamento Total", f"R$ {df_vendas['Valor_Total'].sum():.2f}")
                 st.dataframe(df_vendas.sort_index(ascending=False), use_container_width=True)
                 
-                if st.button("Limpar Histórico") and st.checkbox("Confirmar limpeza"):
+                st.divider()
+                if st.button("Limpar Histórico") and st.checkbox("Tenho certeza"):
                     limpar_vendas()
                     st.rerun()
             else:
-                st.info("Sem vendas registradas.")
+                st.info("Nenhuma venda realizada até o momento.")
+
+        with aba_qrcode:
+            st.header("📲 QR Code para Clientes")
+            st.write("Imprima ou exiba o QR Code abaixo para que os clientes façam pedidos com o celular.")
+            
+            qr_bytes = gerar_qrcode(URL_APP)
+            st.image(qr_bytes, caption="Escaneie para acessar o Cardápio", width=250)
+            st.download_button(
+                label="📥 Baixar QR Code (PNG)",
+                data=qr_bytes,
+                file_name="qrcode_cantina.png",
+                mime="image/png"
+            )
     else:
-        st.warning("🔒 Digite a senha na barra lateral para acessar o painel administrativo.")
+        st.warning("🔒 Digite a senha na barra lateral para acessar o painel da cantina.")
