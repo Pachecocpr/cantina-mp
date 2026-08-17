@@ -89,7 +89,7 @@ def limpar_vendas():
 if "df" not in st.session_state:
     st.session_state.df = carregar_estoque()
 
-st.title("🍔 CANTINA - MIN. DA FAMILIA")
+st.title("🍔 CANTINA - MIN. DA FAMÍLIA")
 
 # Navegação lateral
 modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)", "📲 Gerar QR Code"])
@@ -99,66 +99,97 @@ if modo == "📱 Área do Cliente (Cardápio)":
     st.header("📱 Cardápio Digital - Faça seu Pedido")
     st.caption("Preencha as informações abaixo para enviar seu pedido para o balcão.")
 
-    df_disponiveis = st.session_state.df[st.session_state.df["Estoque"] > 0] if not st.session_state.df.empty else pd.DataFrame()
+    # 1. Carrega dados do estoque e pedidos pendentes atualizados
+    df_estoque_atual = carregar_estoque()
+    st.session_state.df = df_estoque_atual
+    df_pedidos_atuais = carregar_pedidos()
 
-    if df_disponiveis.empty:
-        st.error("Desculpe, não há produtos disponíveis no cardápio no momento!")
+    if df_estoque_atual.empty:
+        st.error("Desculpe, não há produtos cadastrados no cardápio no momento!")
     else:
-        col_c1, col_c2 = st.columns([1, 1])
+        # 2. Calcula reservas de estoque resultantes de pedidos pendentes
+        pedidos_pendentes = df_pedidos_atuais[df_pedidos_atuais["Status"] == "Pendente"]
+        reservas = pedidos_pendentes.groupby("Produto")["Quantidade"].sum().to_dict() if not pedidos_pendentes.empty else {}
 
-        with col_c1:
-            nome_cliente = st.text_input("Seu Nome *", placeholder="Ex: João Silva")
-            celular_cliente = st.text_input("Celular / WhatsApp (com DDD) *", placeholder="Ex: (31) 99999-9999")
-            
-            produtos_disponiveis = df_disponiveis["Produto"].tolist()
+        # 3. Determina o estoque disponível real (Estoque Físico - Reservas Pendentes)
+        df_cardapio = df_estoque_atual.copy()
+        df_cardapio["Estoque_Reservado"] = df_cardapio["Produto"].map(reservas).fillna(0).astype(int)
+        df_cardapio["Estoque_Disponivel"] = df_cardapio["Estoque"] - df_cardapio["Estoque_Reservado"]
 
-            produto_pedid = st.selectbox("Selecione o Produto", produtos_disponiveis, key="cli_prod")
-            linha_prod = df_disponiveis[df_disponiveis["Produto"] == produto_pedid].iloc[0]
-            
-            qtd_max = int(linha_prod["Estoque"])
-            preco_unit = float(linha_prod.get("Preco", 0.0))
+        # 4. Filtra somente itens com estoque real disponível
+        df_disponiveis = df_cardapio[df_cardapio["Estoque_Disponivel"] > 0]
 
-            qtd_pedida = st.number_input("Quantidade", min_value=1, max_value=qtd_max, value=1, key="cli_qtd")
-            
-            forma_pagto = st.radio(
-                "Forma de Pagamento", 
-                ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
-                key="cli_pagto"
-            )
+        if df_disponiveis.empty:
+            st.error("Desculpe, todos os produtos estão temporariamente esgotados ou já foram reservados!")
+        else:
+            col_c1, col_c2 = st.columns([1, 1])
 
-            total_pedido = qtd_pedida * preco_unit
-            st.success(f"**Total a pagar:** R$ {total_pedido:.2f}")
+            with col_c1:
+                nome_cliente = st.text_input("Seu Nome *", placeholder="Ex: João Silva")
+                celular_cliente = st.text_input("Celular / WhatsApp (com DDD) *", placeholder="Ex: (31) 99999-9999")
+                
+                produtos_disponiveis = df_disponiveis["Produto"].tolist()
 
-            if st.button("🚀 Enviar Pedido", type="primary", use_container_width=True):
-                if not nome_cliente.strip():
-                    st.warning("⚠️ Por favor, digite seu nome antes de enviar.")
-                elif not celular_cliente.strip():
-                    st.warning("⚠️ É obrigatório informar seu Celular/WhatsApp para enviar o pedido!")
-                else:
-                    identificacao = f"{nome_cliente.strip()} (Tel: {celular_cliente.strip()})"
+                produto_pedid = st.selectbox("Selecione o Produto", produtos_disponiveis, key="cli_prod")
+                linha_prod = df_disponiveis[df_disponiveis["Produto"] == produto_pedid].iloc[0]
+                
+                # O limite máximo a pedir é exatamente o Estoque Disponível Real
+                qtd_max = int(linha_prod["Estoque_Disponivel"])
+                preco_unit = float(linha_prod.get("Preco", 0.0))
 
-                    novo_id = int(datetime.now().timestamp())
-                    registro = {
-                        "ID": novo_id,
-                        "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "Cliente": identificacao,
-                        "Produto": produto_pedid,
-                        "Quantidade": qtd_pedida,
-                        "Valor_Total": round(total_pedido, 2),
-                        "Forma_Pagamento": forma_pagto,
-                        "Status": "Pendente"
-                    }
-                    salvar_pedido_pendente(registro)
-                    st.balloons()
-                    st.success("✅ Pedido enviado com sucesso! Aguarde a confirmação da cantina.")
+                qtd_pedida = st.number_input("Quantidade", min_value=1, max_value=qtd_max, value=1, key="cli_qtd")
+                
+                forma_pagto = st.radio(
+                    "Forma de Pagamento", 
+                    ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
+                    key="cli_pagto"
+                )
 
-        with col_c2:
-            st.subheader("Cardápio Disponível")
-            st.dataframe(
-                df_disponiveis[["Produto", "Preco"]].rename(columns={"Preco": "Preço (R$)"}),
-                use_container_width=True,
-                hide_index=True
-            )
+                total_pedido = qtd_pedida * preco_unit
+                st.success(f"**Total a pagar:** R$ {total_pedido:.2f}")
+
+                if st.button("🚀 Enviar Pedido", type="primary", use_container_width=True):
+                    if not nome_cliente.strip():
+                        st.warning("⚠️ Por favor, digite seu nome antes de enviar.")
+                    elif not celular_cliente.strip():
+                        st.warning("⚠️ É obrigatório informar seu Celular/WhatsApp para enviar o pedido!")
+                    else:
+                        # Re-validação de segurança no momento do clique (evita concorrência)
+                        df_pedidos_checagem = carregar_pedidos()
+                        pedidos_pend_checagem = df_pedidos_checagem[df_pedidos_checagem["Status"] == "Pendente"]
+                        reserva_atual = pedidos_pend_checagem[pedidos_pend_checagem["Produto"] == produto_pedid]["Quantidade"].sum() if not pedidos_pend_checagem.empty else 0
+                        
+                        estoque_fisico = df_estoque_atual.loc[df_estoque_atual["Produto"] == produto_pedid, "Estoque"].values[0]
+                        disp_momento = estoque_fisico - reserva_atual
+
+                        if qtd_pedida > disp_momento:
+                            st.error(f"⚠️ Ops! Não temos essa quantidade disponível no momento. Restam apenas {disp_momento} unidades.")
+                            st.rerun()
+                        else:
+                            identificacao = f"{nome_cliente.strip()} (Tel: {celular_cliente.strip()})"
+                            novo_id = int(datetime.now().timestamp())
+                            registro = {
+                                "ID": novo_id,
+                                "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "Cliente": identificacao,
+                                "Produto": produto_pedid,
+                                "Quantidade": qtd_pedida,
+                                "Valor_Total": round(total_pedido, 2),
+                                "Forma_Pagamento": forma_pagto,
+                                "Status": "Pendente"
+                            }
+                            salvar_pedido_pendente(registro)
+                            st.balloons()
+                            st.success("✅ Pedido enviado com sucesso! Aguarde a confirmação da cantina.")
+                            st.rerun()
+
+            with col_c2:
+                st.subheader("Cardápio Disponível")
+                st.dataframe(
+                    df_disponiveis[["Produto", "Preco"]].rename(columns={"Preco": "Preço (R$)"}),
+                    use_container_width=True,
+                    hide_index=True
+                )
 
 # --- VISÃO 2: GERADOR DE QR CODE ---
 elif modo == "📲 Gerar QR Code":
@@ -180,6 +211,8 @@ else:
     senha_digitada = st.sidebar.text_input("Senha do Gestor:", type="password")
 
     if senha_digitada == SENHA_GESTOR:
+        st.session_state.df = carregar_estoque()
+        
         if not st.session_state.df.empty:
             produtos_baixos = st.session_state.df[st.session_state.df["Estoque"] <= st.session_state.df["Minimo_Recomendado"]]
             if not produtos_baixos.empty:
