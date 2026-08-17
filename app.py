@@ -89,7 +89,7 @@ def limpar_vendas():
 if "df" not in st.session_state:
     st.session_state.df = carregar_estoque()
 
-st.title("🍔 Gestão da Cantina")
+st.title("🍔 CANTINA - MIN. DA FAMILIA")
 
 # Navegação lateral
 modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)", "📲 Gerar QR Code"])
@@ -99,10 +99,10 @@ if modo == "📱 Área do Cliente (Cardápio)":
     st.header("📱 Cardápio Digital - Faça seu Pedido")
     st.caption("Preencha as informações abaixo para enviar seu pedido para o balcão.")
 
-    df_disponiveis = st.session_state.df[st.session_state.df["Estoque"] > 0]
+    df_disponiveis = st.session_state.df[st.session_state.df["Estoque"] > 0] if not st.session_state.df.empty else pd.DataFrame()
 
     if df_disponiveis.empty:
-        st.error("Desculpe, todos os produtos estão esgotados no momento!")
+        st.error("Desculpe, não há produtos disponíveis no cardápio no momento!")
     else:
         col_c1, col_c2 = st.columns([1, 1])
 
@@ -180,10 +180,11 @@ else:
     senha_digitada = st.sidebar.text_input("Senha do Gestor:", type="password")
 
     if senha_digitada == SENHA_GESTOR:
-        produtos_baixos = st.session_state.df[st.session_state.df["Estoque"] <= st.session_state.df["Minimo_Recomendado"]]
-        if not produtos_baixos.empty:
-            lista_alertas = ", ".join([f"**{row['Produto']}** ({row['Estoque']} un / mín {row['Minimo_Recomendado']})" for _, row in produtos_baixos.iterrows()])
-            st.error(f"🚨 **ESTOQUE CRÍTICO:** {lista_alertas}", icon="⚠️")
+        if not st.session_state.df.empty:
+            produtos_baixos = st.session_state.df[st.session_state.df["Estoque"] <= st.session_state.df["Minimo_Recomendado"]]
+            if not produtos_baixos.empty:
+                lista_alertas = ", ".join([f"**{row['Produto']}** ({row['Estoque']} un / mín {row['Minimo_Recomendado']})" for _, row in produtos_baixos.iterrows()])
+                st.error(f"🚨 **ESTOQUE CRÍTICO:** {lista_alertas}", icon="⚠️")
 
         aba_aprovacao, aba_balcao, aba_gestao, aba_historico = st.tabs([
             "🔔 Pedidos Recebidos",
@@ -213,27 +214,30 @@ else:
 
                         with col_b1:
                             if st.button("✅ Confirmar", key=f"conf_{pedido['ID']}", type="primary"):
-                                estoque_atual = st.session_state.df.loc[st.session_state.df["Produto"] == pedido["Produto"], "Estoque"].values[0]
-                                if estoque_atual >= pedido["Quantidade"]:
-                                    st.session_state.df.loc[st.session_state.df["Produto"] == pedido["Produto"], "Estoque"] -= pedido["Quantidade"]
-                                    salvar_estoque(st.session_state.df)
+                                if not st.session_state.df.empty and pedido["Produto"] in st.session_state.df["Produto"].values:
+                                    estoque_atual = st.session_state.df.loc[st.session_state.df["Produto"] == pedido["Produto"], "Estoque"].values[0]
+                                    if estoque_atual >= pedido["Quantidade"]:
+                                        st.session_state.df.loc[st.session_state.df["Produto"] == pedido["Produto"], "Estoque"] -= pedido["Quantidade"]
+                                        salvar_estoque(st.session_state.df)
 
-                                    salvar_venda_confirmada({
-                                        "Data_Hora": pedido["Data_Hora"],
-                                        "Cliente": pedido["Cliente"],
-                                        "Produto": pedido["Produto"],
-                                        "Quantidade": pedido["Quantidade"],
-                                        "Valor_Total": pedido["Valor_Total"],
-                                        "Forma_Pagamento": pedido["Forma_Pagamento"]
-                                    })
+                                        salvar_venda_confirmada({
+                                            "Data_Hora": pedido["Data_Hora"],
+                                            "Cliente": pedido["Cliente"],
+                                            "Produto": pedido["Produto"],
+                                            "Quantidade": pedido["Quantidade"],
+                                            "Valor_Total": pedido["Valor_Total"],
+                                            "Forma_Pagamento": pedido["Forma_Pagamento"]
+                                        })
 
-                                    df_pedidos.loc[df_pedidos["ID"] == pedido["ID"], "Status"] = "Aprovado"
-                                    atualizar_pedidos_pendentes(df_pedidos)
+                                        df_pedidos.loc[df_pedidos["ID"] == pedido["ID"], "Status"] = "Aprovado"
+                                        atualizar_pedidos_pendentes(df_pedidos)
 
-                                    st.success("Pedido confirmado!")
-                                    st.rerun()
+                                        st.success("Pedido confirmado!")
+                                        st.rerun()
+                                    else:
+                                        st.error("Estoque insuficiente!")
                                 else:
-                                    st.error("Estoque insuficiente!")
+                                    st.error("Produto não existe mais no estoque!")
 
                         with col_b2:
                             if st.button("❌ Rejeitar", key=f"rej_{pedido['ID']}"):
@@ -244,45 +248,49 @@ else:
 
         with aba_balcao:
             st.header("🛒 Registrar Venda no Balcão")
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                produtos_disponiveis = st.session_state.df["Produto"].tolist()
-                produto_selecionado = st.selectbox("Produto", produtos_disponiveis, key="balcao_prod")
-                
-                linha_prod = st.session_state.df[st.session_state.df["Produto"] == produto_selecionado].iloc[0]
-                qtd_atual = int(linha_prod["Estoque"])
-                preco_unitario = float(linha_prod.get("Preco", 0.0))
-                
-                qtd_saida = st.number_input("Quantidade", min_value=1, max_value=qtd_atual if qtd_atual > 0 else 1, value=1, key="balcao_qtd")
-                forma_pagamento = st.radio(
-                    "Pagamento", 
-                    ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
-                    horizontal=True, 
-                    key="balcao_pagto"
-                )
-                
-                valor_total = qtd_saida * preco_unitario
-                st.info(f"**Total:** R$ {valor_total:.2f}")
-                
-                if st.button("Confirmar Venda", type="primary", use_container_width=True):
-                    if qtd_atual >= qtd_saida:
-                        st.session_state.df.loc[st.session_state.df["Produto"] == produto_selecionado, "Estoque"] -= qtd_saida
-                        salvar_estoque(st.session_state.df)
-                        
-                        salvar_venda_confirmada({
-                            "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "Cliente": "Venda Balcão",
-                            "Produto": produto_selecionado,
-                            "Quantidade": qtd_saida,
-                            "Valor_Total": round(valor_total, 2),
-                            "Forma_Pagamento": forma_pagamento
-                        })
-                        st.success("Venda realizada!")
-                        st.rerun()
+            
+            if st.session_state.df.empty:
+                st.warning("Nenhum produto cadastrado no estoque para realizar vendas.")
+            else:
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    produtos_disponiveis = st.session_state.df["Produto"].tolist()
+                    produto_selecionado = st.selectbox("Produto", produtos_disponiveis, key="balcao_prod")
+                    
+                    linha_prod = st.session_state.df[st.session_state.df["Produto"] == produto_selecionado].iloc[0]
+                    qtd_atual = int(linha_prod["Estoque"])
+                    preco_unitario = float(linha_prod.get("Preco", 0.0))
+                    
+                    qtd_saida = st.number_input("Quantidade", min_value=1, max_value=qtd_atual if qtd_atual > 0 else 1, value=1, key="balcao_qtd")
+                    forma_pagamento = st.radio(
+                        "Pagamento", 
+                        ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
+                        horizontal=True, 
+                        key="balcao_pagto"
+                    )
+                    
+                    valor_total = qtd_saida * preco_unitario
+                    st.info(f"**Total:** R$ {valor_total:.2f}")
+                    
+                    if st.button("Confirmar Venda", type="primary", use_container_width=True):
+                        if qtd_atual >= qtd_saida:
+                            st.session_state.df.loc[st.session_state.df["Produto"] == produto_selecionado, "Estoque"] -= qtd_saida
+                            salvar_estoque(st.session_state.df)
+                            
+                            salvar_venda_confirmada({
+                                "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "Cliente": "Venda Balcão",
+                                "Produto": produto_selecionado,
+                                "Quantidade": qtd_saida,
+                                "Valor_Total": round(valor_total, 2),
+                                "Forma_Pagamento": forma_pagamento
+                            })
+                            st.success("Venda realizada!")
+                            st.rerun()
 
-            with col2:
-                st.subheader("Estoque Atual")
-                st.dataframe(st.session_state.df, use_container_width=True)
+                with col2:
+                    st.subheader("Estoque Atual")
+                    st.dataframe(st.session_state.df, use_container_width=True)
 
         with aba_gestao:
             st.header("⚙️ Gestão de Produtos")
@@ -297,7 +305,7 @@ else:
                     if st.form_submit_button("Salvar / Atualizar Produto"):
                         if novo_nome.strip() != "":
                             nome_limpo = novo_nome.strip().capitalize()
-                            if nome_limpo in st.session_state.df["Produto"].values:
+                            if not st.session_state.df.empty and nome_limpo in st.session_state.df["Produto"].values:
                                 st.session_state.df.loc[st.session_state.df["Produto"] == nome_limpo, "Estoque"] = nova_qtd
                                 st.session_state.df.loc[st.session_state.df["Produto"] == nome_limpo, "Minimo_Recomendado"] = novo_min
                                 st.session_state.df.loc[st.session_state.df["Produto"] == nome_limpo, "Preco"] = novo_preco
@@ -318,6 +326,8 @@ else:
                             st.session_state.df = st.session_state.df[st.session_state.df["Produto"] != prod_para_excluir].reset_index(drop=True)
                             salvar_estoque(st.session_state.df)
                             st.rerun()
+                else:
+                    st.info("Nenhum produto cadastrado para excluir.")
 
             st.dataframe(st.session_state.df, use_container_width=True)
 
