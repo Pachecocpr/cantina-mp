@@ -6,18 +6,65 @@ from io import BytesIO
 from datetime import datetime
 
 # Configuração da página
-st.set_page_config(page_title="Cantina - Pedidos e Estoque", page_icon="🍔", layout="wide")
+st.set_page_config(page_title="Cantina dos Ministérios", page_icon="🍔", layout="wide")
 
 # Arquivos de dados
+ARQUIVO_GRUPOS = "grupos.csv"
 ARQUIVO_ESTOQUE = "estoque_cantina.csv"
 ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
+ARQUIVO_USUARIOS = "usuarios.csv"
 
-# LINK PÚBLICO E SENHA DO GESTOR
-URL_APP = "https://cantina-mp-bypacheco.streamlit.app"
-SENHA_GESTOR = "1234"
+URL_BASE = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
 
-# --- FUNÇÕES ---
+# Lista oficial dos 12 Ministérios/Grupos com imagens temáticas padrão
+GRUPOS_PADRAO = [
+    {"Grupo_ID": "Min. da Família", "Imagem_URL": "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=800"},
+    {"Grupo_ID": "Min. de Jovens", "Imagem_URL": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800"},
+    {"Grupo_ID": "Min. Cura e Libertação", "Imagem_URL": "https://images.unsplash.com/photo-1507692049790-de58290a4334?w=800"},
+    {"Grupo_ID": "Min. de Empresários", "Imagem_URL": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800"},
+    {"Grupo_ID": "Min. de Homens", "Imagem_URL": "https://images.unsplash.com/photo-1480455624313-e29b44bbfde1?w=800"},
+    {"Grupo_ID": "Min. das Mulheres", "Imagem_URL": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800"},
+    {"Grupo_ID": "Min. da Melhor idade", "Imagem_URL": "https://images.unsplash.com/photo-1581579438747-1dc8d1e05fec?w=800"},
+    {"Grupo_ID": "Min. de Juniores", "Imagem_URL": "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?w=800"},
+    {"Grupo_ID": "Min. das Crianças", "Imagem_URL": "https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=800"},
+    {"Grupo_ID": "Instruir Para Crescer", "Imagem_URL": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800"},
+    {"Grupo_ID": "Min. de Dança", "Imagem_URL": "https://images.unsplash.com/photo-1518834107812-67b0b7c58434?w=800"},
+    {"Grupo_ID": "Min. de Louvor", "Imagem_URL": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800"},
+]
+
+# --- INICIALIZAÇÃO DOS DADOS ---
+
+def inicializar_arquivos():
+    # 1. Cria a tabela de grupos com as imagens padrão
+    if not os.path.exists(ARQUIVO_GRUPOS):
+        pd.DataFrame(GRUPOS_PADRAO).to_csv(ARQUIVO_GRUPOS, index=False)
+
+    # 2. Cria o Admin do sistema
+    if not os.path.exists(ARQUIVO_USUARIOS):
+        df_usr = pd.DataFrame([
+            {"Usuario": "admin", "Senha": "123", "Role": "SuperAdmin", "Grupo_ID": "TODOS"}
+        ])
+        df_usr.to_csv(ARQUIVO_USUARIOS, index=False)
+
+    if not os.path.exists(ARQUIVO_ESTOQUE):
+        pd.DataFrame(columns=["Grupo_ID", "Produto", "Estoque", "Minimo_Recomendado", "Preco"]).to_csv(ARQUIVO_ESTOQUE, index=False)
+
+    if not os.path.exists(ARQUIVO_VENDAS):
+        pd.DataFrame(columns=["Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento"]).to_csv(ARQUIVO_VENDAS, index=False)
+
+    if not os.path.exists(ARQUIVO_PEDIDOS):
+        pd.DataFrame(columns=["ID", "Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento", "Status"]).to_csv(ARQUIVO_PEDIDOS, index=False)
+
+inicializar_arquivos()
+
+# --- FUNÇÕES AUXILIARES ---
+
+def carregar_df(caminho):
+    return pd.read_csv(caminho) if os.path.exists(caminho) else pd.DataFrame()
+
+def salvar_df(df, caminho):
+    df.to_csv(caminho, index=False)
 
 def gerar_qrcode(url):
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
@@ -28,372 +75,344 @@ def gerar_qrcode(url):
     img.save(buf, format="PNG")
     return buf.getvalue()
 
-def carregar_estoque():
-    if os.path.exists(ARQUIVO_ESTOQUE):
-        df = pd.read_csv(ARQUIVO_ESTOQUE)
-        if "Preco" not in df.columns:
-            df["Preco"] = 0.0
-        return df
-    else:
-        df = pd.DataFrame({
-            "Produto": ["Salgado", "Refrigerante", "Suco", "Chocolate", "Sanduíche"],
-            "Estoque": [50, 40, 5, 60, 2],
-            "Minimo_Recomendado": [10, 10, 8, 15, 5],
-            "Preco": [6.50, 5.00, 4.50, 3.50, 8.00]
-        })
-        df.to_csv(ARQUIVO_ESTOQUE, index=False)
-        return df
+# --- SESSÃO E AUTENTICAÇÃO ---
 
-def carregar_vendas():
-    if os.path.exists(ARQUIVO_VENDAS):
-        return pd.read_csv(ARQUIVO_VENDAS)
-    else:
-        df = pd.DataFrame(columns=["Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento"])
-        df.to_csv(ARQUIVO_VENDAS, index=False)
-        return df
+if "usuario_logado" not in st.session_state:
+    st.session_state.usuario_logado = None
+    st.session_state.role = "Cliente"
+    st.session_state.grupo_id = None
 
-def carregar_pedidos():
-    if os.path.exists(ARQUIVO_PEDIDOS):
-        return pd.read_csv(ARQUIVO_PEDIDOS)
-    else:
-        df = pd.DataFrame(columns=["ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento", "Status"])
-        df.to_csv(ARQUIVO_PEDIDOS, index=False)
-        return df
+st.sidebar.title("🔐 Login de Gestão")
 
-def salvar_estoque(df):
-    df.to_csv(ARQUIVO_ESTOQUE, index=False)
+df_usuarios = carregar_df(ARQUIVO_USUARIOS)
 
-def salvar_pedido_pendente(registro):
-    df_pedidos = carregar_pedidos()
-    df_novo = pd.DataFrame([registro])
-    df_pedidos = pd.concat([df_pedidos, df_novo], ignore_index=True)
-    df_pedidos.to_csv(ARQUIVO_PEDIDOS, index=False)
+if st.session_state.usuario_logado is None:
+    with st.sidebar.expander("Acesso para Gestores e Admin", expanded=False):
+        user_input = st.text_input("Usuário")
+        pass_input = st.text_input("Senha", type="password")
+        if st.button("Entrar"):
+            usr_match = df_usuarios[(df_usuarios["Usuario"] == user_input.strip()) & (df_usuarios["Senha"] == pass_input.strip())]
+            if not usr_match.empty:
+                info_usr = usr_match.iloc[0]
+                st.session_state.usuario_logado = info_usr["Usuario"]
+                st.session_state.role = info_usr["Role"]
+                st.session_state.grupo_id = info_usr["Grupo_ID"]
+                st.rerun()
+            else:
+                st.sidebar.error("Usuário ou senha inválidos.")
+else:
+    st.sidebar.info(f"👤 **{st.session_state.usuario_logado}** ({st.session_state.role})")
+    if st.button("Sair (Logout)"):
+        st.session_state.usuario_logado = None
+        st.session_state.role = "Cliente"
+        st.session_state.grupo_id = None
+        st.rerun()
 
-def salvar_venda_confirmada(registro):
-    df_vendas = carregar_vendas()
-    df_novo = pd.DataFrame([registro])
-    df_vendas = pd.concat([df_vendas, df_novo], ignore_index=True)
-    df_vendas.to_csv(ARQUIVO_VENDAS, index=False)
+st.title("🍔 Gestão da Cantina")
 
-def atualizar_pedidos_pendentes(df_pedidos):
-    df_pedidos.to_csv(ARQUIVO_PEDIDOS, index=False)
+# --- CARREGAMENTO DOS GRUPOS E IMAGENS ---
 
-def limpar_vendas():
-    df_vazio_vendas = pd.DataFrame(columns=["Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento"])
-    df_vazio_vendas.to_csv(ARQUIVO_VENDAS, index=False)
+df_grupos = carregar_df(ARQUIVO_GRUPOS)
+
+# Garante que a coluna Imagem_URL exista
+if "Imagem_URL" not in df_grupos.columns:
+    df_grupos["Imagem_URL"] = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800"
+    salvar_df(df_grupos, ARQUIVO_GRUPOS)
+
+lista_de_grupos = df_grupos["Grupo_ID"].tolist() if not df_grupos.empty else []
+
+if st.session_state.role == "SuperAdmin":
+    st.sidebar.subheader("👑 Painel Admin")
+    grupo_ativo = st.sidebar.selectbox("Visualizar Dados do Grupo:", ["TODOS"] + lista_de_grupos)
+elif st.session_state.role == "Gestor":
+    grupo_ativo = st.session_state.grupo_id
+    st.sidebar.info(f"Sua Cantina: **{grupo_ativo}**")
+else:
+    query_params = st.query_params
+    grupo_param = query_params.get("grupo", None)
     
-    df_vazio_pedidos = pd.DataFrame(columns=["ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento", "Status"])
-    df_vazio_pedidos.to_csv(ARQUIVO_PEDIDOS, index=False)
-
-# Inicializa sessão
-if "df" not in st.session_state:
-    st.session_state.df = carregar_estoque()
-
-st.title("🍔 CANTINA - MINISTÉRIO DA FAMÍLIA 👨‍👩‍👧‍👦")
-
-# Navegação lateral
-modo = st.sidebar.radio("Navegação:", ["📱 Área do Cliente (Cardápio)", "🔒 Área Restrita (Cantina)", "📲 Gerar QR Code"])
-
-# --- VISÃO 1: ÁREA DO CLIENTE ---
-if modo == "📱 Área do Cliente (Cardápio)":
-    st.header("📱 Cardápio Digital - Faça seu Pedido")
-    st.caption("Preencha as informações abaixo para enviar seu pedido para o balcão.")
-
-    # 1. Carrega dados do estoque e pedidos pendentes atualizados
-    df_estoque_atual = carregar_estoque()
-    st.session_state.df = df_estoque_atual
-    df_pedidos_atuais = carregar_pedidos()
-
-    if df_estoque_atual.empty:
-        st.error("Desculpe, não há produtos cadastrados no cardápio no momento!")
-        if st.button("🔄 Recarregar Página"):
-            st.rerun()
+    if grupo_param and grupo_param in lista_de_grupos:
+        grupo_ativo = grupo_param
     else:
-        # 2. Calcula reservas de estoque resultantes de pedidos pendentes
-        pedidos_pendentes = df_pedidos_atuais[df_pedidos_atuais["Status"] == "Pendente"]
-        reservas = pedidos_pendentes.groupby("Produto")["Quantidade"].sum().to_dict() if not pedidos_pendentes.empty else {}
+        grupo_ativo = st.sidebar.selectbox("Escolha o Ministério / Grupo:", lista_de_grupos)
 
-        # 3. Determina o estoque disponível real (Estoque Físico - Reservas Pendentes)
-        df_cardapio = df_estoque_atual.copy()
+# --- NAVEGAÇÃO COMPATÍVEL COM PERMISSÕES ---
+opcoes_menu = ["📱 Cardápio (Cliente)"]
+if st.session_state.role in ["Gestor", "SuperAdmin"]:
+    opcoes_menu.extend(["🔔 Pedidos Recebidos", "🛒 Venda Balcão", "⚙️ Gestão de Estoque", "📊 Histórico de Vendas", "📲 Gerar QR Code"])
+if st.session_state.role == "SuperAdmin":
+    opcoes_menu.append("👑 Administração Geral")
+
+modo = st.sidebar.radio("Navegação do App:", opcoes_menu, horizontal=True)
+st.divider()
+
+# --- VISÃO 1: CARDÁPIO DO CLIENTE ---
+if modo == "📱 Cardápio (Cliente)":
+    # Exibe o Título com a Imagem do Grupo no Cardápio Principal
+    if grupo_ativo != "TODOS":
+        info_grupo = df_grupos[df_grupos["Grupo_ID"] == grupo_ativo]
+        url_imagem = info_grupo["Imagem_URL"].values[0] if not info_grupo.empty else "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800"
+        
+        col_img, col_tit = st.columns([1, 3])
+        with col_img:
+            st.image(url_imagem, use_column_width=True)
+        with col_tit:
+            st.title(f"✨ {grupo_ativo}")
+            st.subheader("Cardápio Digital da Cantina")
+            st.caption("Faça seu pedido abaixo para ser preparado pela equipe.")
+    else:
+        st.header("📱 Cardápio Digital - Visão Geral")
+
+    df_estoque = carregar_df(ARQUIVO_ESTOQUE)
+    df_pedidos = carregar_df(ARQUIVO_PEDIDOS)
+
+    df_estoque_grp = df_estoque[df_estoque["Grupo_ID"] == grupo_ativo] if not df_estoque.empty else pd.DataFrame()
+    df_pedidos_grp = df_pedidos[(df_pedidos["Grupo_ID"] == grupo_ativo) & (df_pedidos["Status"] == "Pendente")] if not df_pedidos.empty else pd.DataFrame()
+
+    if df_estoque_grp.empty:
+        st.warning(f"Nenhum produto cadastrado para a cantina **{grupo_ativo}** no momento.")
+    else:
+        reservas = df_pedidos_grp.groupby("Produto")["Quantidade"].sum().to_dict() if not df_pedidos_grp.empty else {}
+        
+        df_cardapio = df_estoque_grp.copy()
         df_cardapio["Estoque_Reservado"] = df_cardapio["Produto"].map(reservas).fillna(0).astype(int)
         df_cardapio["Estoque_Disponivel"] = df_cardapio["Estoque"] - df_cardapio["Estoque_Reservado"]
+        
+        df_disp = df_cardapio[df_cardapio["Estoque_Disponivel"] > 0]
 
-        # 4. Filtra somente itens com estoque real disponível (> 0)
-        df_disponiveis = df_cardapio[df_cardapio["Estoque_Disponivel"] > 0]
-
-        if df_disponiveis.empty:
-            st.error("⚠️ Todos os produtos do cardápio estão temporariamente esgotados ou já foram reservados!")
-            st.info("Aguarde alguns minutos ou clique abaixo para verificar novamente se novos itens foram liberados.")
-            if st.button("🔄 Atualizar Cardápio", type="primary", use_container_width=True):
-                st.rerun()
+        if df_disp.empty:
+            st.error("⚠️ Todos os produtos desta cantina estão esgotados agora!")
         else:
-            col_c1, col_c2 = st.columns([1, 1])
-
-            with col_c1:
-                with st.form("form_pedido_cliente", clear_on_submit=True):
-                    nome_cliente = st.text_input("Seu Nome *", placeholder="Ex: João Silva")
-                    celular_cliente = st.text_input("Celular / WhatsApp (com DDD) *", placeholder="Ex: (31) 99999-9999")
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                with st.form("form_cliente", clear_on_submit=True):
+                    nome_cliente = st.text_input("Seu Nome *")
+                    celular = st.text_input("Celular / WhatsApp *")
+                    prod_sel = st.selectbox("Produto", df_disp["Produto"].tolist())
                     
-                    produtos_disponiveis = df_disponiveis["Produto"].tolist()
-                    produto_pedid = st.selectbox("Selecione o Produto", produtos_disponiveis, key="cli_prod")
-                    
-                    linha_prod = df_disponiveis[df_disponiveis["Produto"] == produto_pedid].iloc[0]
+                    linha_prod = df_disp[df_disp["Produto"] == prod_sel].iloc[0]
                     qtd_max = int(linha_prod["Estoque_Disponivel"])
-                    preco_unit = float(linha_prod.get("Preco", 0.0))
+                    preco_unit = float(linha_prod["Preco"])
 
-                    qtd_pedida = st.number_input(
-                        f"Quantidade (Disponível: {qtd_max})", 
-                        min_value=1, 
-                        max_value=max(1, qtd_max), 
-                        value=1, 
-                        key="cli_qtd"
-                    )
-                    
-                    forma_pagto = st.radio(
-                        "Forma de Pagamento", 
-                        ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
-                        key="cli_pagto"
-                    )
+                    qtd = st.number_input(f"Quantidade (Max: {qtd_max})", min_value=1, max_value=max(1, qtd_max), value=1)
+                    pagto = st.radio("Pagamento", ["Pix", "Dinheiro", "Cartão Débito", "Cartão Crédito", "Posterior"])
 
-                    total_pedido = qtd_pedida * preco_unit
-                    st.info(f"**Total a pagar:** R$ {total_pedido:.2f}")
+                    total = qtd * preco_unit
+                    st.info(f"**Total:** R$ {total:.2f}")
 
-                    btn_enviar = st.form_submit_button("🚀 Enviar Pedido", type="primary", use_container_width=True)
-
-                if btn_enviar:
-                    if not nome_cliente.strip():
-                        st.warning("⚠️ Por favor, digite seu nome antes de enviar.")
-                    elif not celular_cliente.strip():
-                        st.warning("⚠️ É obrigatório informar seu Celular/WhatsApp para enviar o pedido!")
-                    else:
-                        # Re-validação em tempo de clique
-                        df_pedidos_checagem = carregar_pedidos()
-                        pedidos_pend_checagem = df_pedidos_checagem[df_pedidos_checagem["Status"] == "Pendente"]
-                        reserva_atual = pedidos_pend_checagem[pedidos_pend_checagem["Produto"] == produto_pedid]["Quantidade"].sum() if not pedidos_pend_checagem.empty else 0
-                        
-                        estoque_fisico = df_estoque_atual.loc[df_estoque_atual["Produto"] == produto_pedid, "Estoque"].values[0]
-                        disp_momento = estoque_fisico - reserva_atual
-
-                        if qtd_pedida > disp_momento:
-                            st.error(f"⚠️ Ops! Apenas {disp_momento} unidades de '{produto_pedid}' continuam disponíveis.")
-                            st.warning("O cardápio foi atualizado. Por favor, tente novamente com uma quantidade menor.")
+                    if st.form_submit_button("🚀 Enviar Pedido", type="primary", use_container_width=True):
+                        if not nome_cliente.strip() or not celular.strip():
+                            st.warning("Preencha seu nome e celular.")
                         else:
-                            identificacao = f"{nome_cliente.strip()} (Tel: {celular_cliente.strip()})"
-                            novo_id = int(datetime.now().timestamp())
-                            registro = {
-                                "ID": novo_id,
+                            novo_pedido = {
+                                "ID": int(datetime.now().timestamp()),
+                                "Grupo_ID": grupo_ativo,
                                 "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "Cliente": identificacao,
-                                "Produto": produto_pedid,
-                                "Quantidade": qtd_pedida,
-                                "Valor_Total": round(total_pedido, 2),
-                                "Forma_Pagamento": forma_pagto,
+                                "Cliente": f"{nome_cliente.strip()} ({celular.strip()})",
+                                "Produto": prod_sel,
+                                "Quantidade": qtd,
+                                "Valor_Total": round(total, 2),
+                                "Forma_Pagamento": pagto,
                                 "Status": "Pendente"
                             }
-                            salvar_pedido_pendente(registro)
+                            salvar_df(pd.concat([df_pedidos, pd.DataFrame([novo_pedido])], ignore_index=True), ARQUIVO_PEDIDOS)
                             st.balloons()
-                            st.success("✅ Pedido enviado com sucesso! Aguarde a confirmação da cantina.")
+                            st.success("✅ Pedido enviado! Aguarde no balcão.")
 
-            with col_c2:
-                st.subheader("Cardápio Disponível")
-                st.dataframe(
-                    df_disponiveis[["Produto", "Preco", "Estoque_Disponivel"]].rename(
-                        columns={"Preco": "Preço (R$)", "Estoque_Disponivel": "Disponível"}
-                    ),
-                    use_container_width=True,
-                    hide_index=True
-                )
+            with col2:
+                st.subheader("Itens Disponíveis")
+                st.dataframe(df_disp[["Produto", "Preco", "Estoque_Disponivel"]].rename(columns={"Preco": "Preço (R$)", "Estoque_Disponivel": "Disponível"}), use_container_width=True, hide_index=True)
 
-# --- VISÃO 2: GERADOR DE QR CODE ---
-elif modo == "📲 Gerar QR Code":
-    st.header("📲 QR Code para Acesso Rápido")
-    st.write("Exiba ou imprima este QR Code para que os clientes abram o cardápio no celular.")
-    
-    qr_bytes = gerar_qrcode(URL_APP)
-    st.image(qr_bytes, caption="Escaneie para fazer seu pedido", width=250)
-    st.download_button(
-        label="📥 Baixar Imagem do QR Code",
-        data=qr_bytes,
-        file_name="qrcode_cantina.png",
-        mime="image/png"
-    )
+# --- VISÃO 2: PEDIDOS RECEBIDOS ---
+elif modo == "🔔 Pedidos Recebidos":
+    st.header(f"🔔 Pedidos Recebidos - {grupo_ativo}")
+    df_pedidos = carregar_df(ARQUIVO_PEDIDOS)
+    df_estoque = carregar_df(ARQUIVO_ESTOQUE)
+    df_vendas = carregar_df(ARQUIVO_VENDAS)
 
-# --- VISÃO 3: ÁREA DA CANTINA (COM SENHA) ---
-else:
-    st.sidebar.divider()
-    senha_digitada = st.sidebar.text_input("Senha do Gestor:", type="password")
+    filtro_pedidos = df_pedidos if grupo_ativo == "TODOS" else df_pedidos[df_pedidos["Grupo_ID"] == grupo_ativo]
+    pendentes = filtro_pedidos[filtro_pedidos["Status"] == "Pendente"] if not filtro_pedidos.empty else pd.DataFrame()
 
-    if senha_digitada == SENHA_GESTOR:
-        st.session_state.df = carregar_estoque()
-        
-        if not st.session_state.df.empty:
-            produtos_baixos = st.session_state.df[st.session_state.df["Estoque"] <= st.session_state.df["Minimo_Recomendado"]]
-            if not produtos_baixos.empty:
-                lista_alertas = ", ".join([f"**{row['Produto']}** ({row['Estoque']} un / mín {row['Minimo_Recomendado']})" for _, row in produtos_baixos.iterrows()])
-                st.error(f"🚨 **ESTOQUE CRÍTICO:** {lista_alertas}", icon="⚠️")
-
-        aba_aprovacao, aba_balcao, aba_gestao, aba_historico = st.tabs([
-            "🔔 Pedidos Recebidos",
-            "🛒 Venda Balcão",
-            "⚙️ Gestão de Estoque",
-            "📊 Histórico de Vendas"
-        ])
-
-        with aba_aprovacao:
-            st.header("🔔 Pedidos Recebidos dos Clientes")
-            if st.button("🔄 Atualizar Lista de Pedidos"):
-                st.rerun()
-
-            df_pedidos = carregar_pedidos()
-            pedidos_pendentes = df_pedidos[df_pedidos["Status"] == "Pendente"]
-
-            if pedidos_pendentes.empty:
-                st.info("Nenhum pedido pendente no momento.")
-            else:
-                for idx, pedido in pedidos_pendentes.iterrows():
-                    with st.expander(f"📦 Pedido de **{pedido['Cliente']}** - R$ {pedido['Valor_Total']:.2f} ({pedido['Data_Hora']})", expanded=True):
-                        col_info, col_b1, col_b2 = st.columns([3, 1, 1])
-
-                        with col_info:
-                            st.write(f"**Item:** {pedido['Quantidade']}x {pedido['Produto']}")
-                            st.write(f"**Pagamento:** {pedido['Forma_Pagamento']}")
-
-                        with col_b1:
-                            if st.button("✅ Confirmar", key=f"conf_{pedido['ID']}", type="primary"):
-                                if not st.session_state.df.empty and pedido["Produto"] in st.session_state.df["Produto"].values:
-                                    estoque_atual = st.session_state.df.loc[st.session_state.df["Produto"] == pedido["Produto"], "Estoque"].values[0]
-                                    if estoque_atual >= pedido["Quantidade"]:
-                                        st.session_state.df.loc[st.session_state.df["Produto"] == pedido["Produto"], "Estoque"] -= pedido["Quantidade"]
-                                        salvar_estoque(st.session_state.df)
-
-                                        salvar_venda_confirmada({
-                                            "Data_Hora": pedido["Data_Hora"],
-                                            "Cliente": pedido["Cliente"],
-                                            "Produto": pedido["Produto"],
-                                            "Quantidade": pedido["Quantidade"],
-                                            "Valor_Total": pedido["Valor_Total"],
-                                            "Forma_Pagamento": pedido["Forma_Pagamento"]
-                                        })
-
-                                        df_pedidos.loc[df_pedidos["ID"] == pedido["ID"], "Status"] = "Aprovado"
-                                        atualizar_pedidos_pendentes(df_pedidos)
-
-                                        st.success("Pedido confirmado!")
-                                        st.rerun()
-                                    else:
-                                        st.error("Estoque insuficiente!")
-                                else:
-                                    st.error("Produto não existe mais no estoque!")
-
-                        with col_b2:
-                            if st.button("❌ Rejeitar", key=f"rej_{pedido['ID']}"):
-                                df_pedidos.loc[df_pedidos["ID"] == pedido["ID"], "Status"] = "Rejeitado"
-                                atualizar_pedidos_pendentes(df_pedidos)
-                                st.warning("Pedido rejeitado.")
-                                st.rerun()
-
-        with aba_balcao:
-            st.header("🛒 Registrar Venda no Balcão")
-            
-            if st.session_state.df.empty:
-                st.warning("Nenhum produto cadastrado no estoque para realizar vendas.")
-            else:
-                col1, col2 = st.columns([1, 2])
-                with col1:
-                    produtos_disponiveis = st.session_state.df["Produto"].tolist()
-                    produto_selecionado = st.selectbox("Produto", produtos_disponiveis, key="balcao_prod")
-                    
-                    linha_prod = st.session_state.df[st.session_state.df["Produto"] == produto_selecionado].iloc[0]
-                    qtd_atual = int(linha_prod["Estoque"])
-                    preco_unitario = float(linha_prod.get("Preco", 0.0))
-                    
-                    qtd_saida = st.number_input("Quantidade", min_value=1, max_value=qtd_atual if qtd_atual > 0 else 1, value=1, key="balcao_qtd")
-                    forma_pagamento = st.radio(
-                        "Pagamento", 
-                        ["Pix", "Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pagamento Posterior"], 
-                        horizontal=True, 
-                        key="balcao_pagto"
-                    )
-                    
-                    valor_total = qtd_saida * preco_unitario
-                    st.info(f"**Total:** R$ {valor_total:.2f}")
-                    
-                    if st.button("Confirmar Venda", type="primary", use_container_width=True):
-                        if qtd_atual >= qtd_saida:
-                            st.session_state.df.loc[st.session_state.df["Produto"] == produto_selecionado, "Estoque"] -= qtd_saida
-                            salvar_estoque(st.session_state.df)
-                            
-                            salvar_venda_confirmada({
-                                "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "Cliente": "Venda Balcão",
-                                "Produto": produto_selecionado,
-                                "Quantidade": qtd_saida,
-                                "Valor_Total": round(valor_total, 2),
-                                "Forma_Pagamento": forma_pagamento
-                            })
-                            st.success("Venda realizada!")
-                            st.rerun()
-
-                with col2:
-                    st.subheader("Estoque Atual")
-                    st.dataframe(st.session_state.df, use_container_width=True)
-
-        with aba_gestao:
-            st.header("⚙️ Gestão de Produtos")
-            col_cad, col_exc = st.columns([2, 1])
-            with col_cad:
-                with st.form("form_produto"):
-                    novo_nome = st.text_input("Nome do Produto")
-                    nova_qtd = st.number_input("Estoque Atual", min_value=0, value=10)
-                    novo_min = st.number_input("Estoque Mínimo", min_value=0, value=5)
-                    novo_preco = st.number_input("Preço Unitário (R$)", min_value=0.0, value=5.00, step=0.50)
-                        
-                    if st.form_submit_button("Salvar / Atualizar Produto"):
-                        if novo_nome.strip() != "":
-                            nome_limpo = novo_nome.strip().capitalize()
-                            if not st.session_state.df.empty and nome_limpo in st.session_state.df["Produto"].values:
-                                st.session_state.df.loc[st.session_state.df["Produto"] == nome_limpo, "Estoque"] = nova_qtd
-                                st.session_state.df.loc[st.session_state.df["Produto"] == nome_limpo, "Minimo_Recomendado"] = novo_min
-                                st.session_state.df.loc[st.session_state.df["Produto"] == nome_limpo, "Preco"] = novo_preco
-                            else:
-                                nova_linha = pd.DataFrame([{"Produto": nome_limpo, "Estoque": nova_qtd, "Minimo_Recomendado": novo_min, "Preco": novo_preco}])
-                                st.session_state.df = pd.concat([st.session_state.df, nova_linha], ignore_index=True)
-                            
-                            salvar_estoque(st.session_state.df)
-                            st.success("Produto salvo!")
-                            st.rerun()
-
-            with col_exc:
-                if not st.session_state.df.empty:
-                    prod_para_excluir = st.selectbox("Excluir Produto", st.session_state.df["Produto"].tolist(), key="exc_prod")
-                    confirmar = st.checkbox("Confirmar Exclusão")
-                    if st.button("🗑️ Excluir"):
-                        if confirmar:
-                            st.session_state.df = st.session_state.df[st.session_state.df["Produto"] != prod_para_excluir].reset_index(drop=True)
-                            salvar_estoque(st.session_state.df)
-                            st.rerun()
-                else:
-                    st.info("Nenhum produto cadastrado para excluir.")
-
-            st.dataframe(st.session_state.df, use_container_width=True)
-
-        with aba_historico:
-            st.header("📊 Histórico de Vendas")
-            df_vendas = carregar_vendas()
-            if not df_vendas.empty:
-                st.metric("Faturamento Total", f"R$ {df_vendas['Valor_Total'].sum():.2f}")
-                st.dataframe(df_vendas.sort_index(ascending=False), use_container_width=True)
-                
-                st.divider()
-                confirmar_limpeza = st.checkbox("Marque para confirmar a exclusão de todo o histórico")
-                if st.button("🗑️ Limpar Histórico de Vendas", type="primary"):
-                    if confirmar_limpeza:
-                        limpar_vendas()
-                        st.success("Histórico apagado com sucesso!")
-                        st.rerun()
-                    else:
-                        st.warning("⚠️ Você precisa marcar a caixinha de confirmação antes de limpar.")
-            else:
-                st.info("Nenhuma venda realizada até o momento.")
+    if pendentes.empty:
+        st.info("Nenhum pedido pendente.")
     else:
-        st.warning("🔒 Digite a senha na barra lateral para acessar o painel da cantina.")
+        for idx, ped in pendentes.iterrows():
+            with st.expander(f"📦 [{ped['Grupo_ID']}] {ped['Cliente']} - R$ {ped['Valor_Total']:.2f}", expanded=True):
+                st.write(f"**Item:** {ped['Quantidade']}x {ped['Produto']} | **Pagamento:** {ped['Forma_Pagamento']}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Confirmar", key=f"conf_{ped['ID']}", type="primary"):
+                        mask = (df_estoque["Grupo_ID"] == ped["Grupo_ID"]) & (df_estoque["Produto"] == ped["Produto"])
+                        if not df_estoque[mask].empty and df_estoque.loc[mask, "Estoque"].values[0] >= ped["Quantidade"]:
+                            df_estoque.loc[mask, "Estoque"] -= ped["Quantidade"]
+                            salvar_df(df_estoque, ARQUIVO_ESTOQUE)
+
+                            nova_venda = ped.to_dict()
+                            del nova_venda["ID"]
+                            del nova_venda["Status"]
+                            salvar_df(pd.concat([df_vendas, pd.DataFrame([nova_venda])], ignore_index=True), ARQUIVO_VENDAS)
+
+                            df_pedidos.loc[df_pedidos["ID"] == ped["ID"], "Status"] = "Aprovado"
+                            salvar_df(df_pedidos, ARQUIVO_PEDIDOS)
+                            st.success("Aprovado!")
+                            st.rerun()
+                        else:
+                            st.error("Estoque insuficiente!")
+                with col2:
+                    if st.button("❌ Rejeitar", key=f"rej_{ped['ID']}"):
+                        df_pedidos.loc[df_pedidos["ID"] == ped["ID"], "Status"] = "Rejeitado"
+                        salvar_df(df_pedidos, ARQUIVO_PEDIDOS)
+                        st.warning("Rejeitado.")
+                        st.rerun()
+
+# --- VISÃO 3: VENDAS BALCÃO ---
+elif modo == "🛒 Venda Balcão":
+    st.header(f"🛒 Venda Balcão - {grupo_ativo}")
+    if grupo_ativo == "TODOS":
+        st.warning("Selecione um grupo específico na barra lateral.")
+    else:
+        df_estoque = carregar_df(ARQUIVO_ESTOQUE)
+        df_vendas = carregar_df(ARQUIVO_VENDAS)
+        df_est_grp = df_estoque[df_estoque["Grupo_ID"] == grupo_ativo] if not df_estoque.empty else pd.DataFrame()
+
+        if df_est_grp.empty:
+            st.warning("Nenhum produto cadastrado.")
+        else:
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                prod_sel = st.selectbox("Produto", df_est_grp["Produto"].tolist())
+                linha_prod = df_est_grp[df_est_grp["Produto"] == prod_sel].iloc[0]
+                qtd_est = int(linha_prod["Estoque"])
+                preco = float(linha_prod["Preco"])
+
+                qtd = st.number_input("Quantidade", min_value=1, max_value=max(1, qtd_est), value=1)
+                pagto = st.radio("Pagamento", ["Pix", "Dinheiro", "Cartão Débito", "Cartão Crédito", "Posterior"])
+                total = qtd * preco
+                st.info(f"**Total:** R$ {total:.2f}")
+
+                if st.button("Confirmar Venda", type="primary"):
+                    if qtd_est >= qtd:
+                        mask = (df_estoque["Grupo_ID"] == grupo_ativo) & (df_estoque["Produto"] == prod_sel)
+                        df_estoque.loc[mask, "Estoque"] -= qtd
+                        salvar_df(df_estoque, ARQUIVO_ESTOQUE)
+                        venda_dict = {
+                            "Grupo_ID": grupo_ativo, "Data_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "Cliente": "Venda Balcão", "Produto": prod_sel, "Quantidade": qtd,
+                            "Valor_Total": round(total, 2), "Forma_Pagamento": pagto
+                        }
+                        salvar_df(pd.concat([df_vendas, pd.DataFrame([venda_dict])], ignore_index=True), ARQUIVO_VENDAS)
+                        st.success("Venda registrada!")
+                        st.rerun()
+
+            with col2:
+                st.subheader("Estoque Local")
+                st.dataframe(df_est_grp[["Produto", "Estoque", "Preco"]], use_container_width=True)
+
+# --- VISÃO 4: GESTÃO DE ESTOQUE ---
+elif modo == "⚙️ Gestão de Estoque":
+    st.header(f"⚙️ Gestão de Estoque - {grupo_ativo}")
+    if grupo_ativo == "TODOS":
+        st.warning("Selecione um grupo específico na barra lateral.")
+    else:
+        df_estoque = carregar_df(ARQUIVO_ESTOQUE)
+        with st.form("form_prod"):
+            nome = st.text_input("Nome do Produto")
+            qtd = st.number_input("Estoque", min_value=0, value=10)
+            minimo = st.number_input("Estoque Mínimo", min_value=0, value=5)
+            preco = st.number_input("Preço (R$)", min_value=0.0, value=5.00)
+
+            if st.form_submit_button("Salvar / Atualizar Produto"):
+                if nome.strip():
+                    nome_limpo = nome.strip().capitalize()
+                    mask = (df_estoque["Grupo_ID"] == grupo_ativo) & (df_estoque["Produto"] == nome_limpo)
+                    if not df_estoque[mask].empty:
+                        df_estoque.loc[mask, ["Estoque", "Minimo_Recomendado", "Preco"]] = [qtd, minimo, preco]
+                    else:
+                        nova_linha = {"Grupo_ID": grupo_ativo, "Produto": nome_limpo, "Estoque": qtd, "Minimo_Recomendado": minimo, "Preco": preco}
+                        df_estoque = pd.concat([df_estoque, pd.DataFrame([nova_linha])], ignore_index=True)
+                    salvar_df(df_estoque, ARQUIVO_ESTOQUE)
+                    st.success("Produto salvo!")
+                    st.rerun()
+
+        st.dataframe(df_estoque[df_estoque["Grupo_ID"] == grupo_ativo], use_container_width=True)
+
+# --- VISÃO 5: HISTÓRICO ---
+elif modo == "📊 Histórico de Vendas":
+    st.header(f"📊 Histórico de Vendas - {grupo_ativo}")
+    df_vendas = carregar_df(ARQUIVO_VENDAS)
+    filtro_vendas = df_vendas if grupo_ativo == "TODOS" else df_vendas[df_vendas["Grupo_ID"] == grupo_ativo]
+
+    if not filtro_vendas.empty:
+        st.metric("Faturamento Total", f"R$ {filtro_vendas['Valor_Total'].sum():.2f}")
+        st.dataframe(filtro_vendas, use_container_width=True)
+    else:
+        st.info("Nenhuma venda cadastrada.")
+
+# --- VISÃO 6: QR CODE ---
+elif modo == "📲 Gerar QR Code":
+    st.header(f"📲 QR Code - {grupo_ativo}")
+    if grupo_ativo == "TODOS":
+        st.warning("Selecione um grupo específico na barra lateral.")
+    else:
+        url_grupo = f"{URL_BASE}?grupo={grupo_ativo}"
+        qr_bytes = gerar_qrcode(url_grupo)
+        st.image(qr_bytes, width=250)
+        st.code(url_grupo, language="http")
+
+# --- VISÃO 7: ADMINISTRAÇÃO GERAL ---
+elif modo == "👑 Administração Geral":
+    st.header("👑 Administração Global (SuperAdmin)")
+    
+    col_admin1, col_admin2 = st.columns(2)
+
+    with col_admin1:
+        st.subheader("🏢 Cadastrar / Editar Grupos & Imagens")
+        with st.form("form_novo_grupo"):
+            novo_grupo_nome = st.text_input("Nome do Grupo / Ministério")
+            nova_img_url = st.text_input("URL da Imagem (Link)", value="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800")
+            
+            if st.form_submit_button("Salvar Grupo / Imagem"):
+                if novo_grupo_nome.strip():
+                    nome_formatado = novo_grupo_nome.strip()
+                    mask_grp = df_grupos["Grupo_ID"] == nome_formatado
+                    if mask_grp.any():
+                        df_grupos.loc[mask_grp, "Imagem_URL"] = nova_img_url.strip()
+                        st.success(f"Imagem do '{nome_formatado}' atualizada!")
+                    else:
+                        df_grupos = pd.concat([df_grupos, pd.DataFrame([{"Grupo_ID": nome_formatado, "Imagem_URL": nova_img_url.strip()}])], ignore_index=True)
+                        st.success(f"Grupo '{nome_formatado}' cadastrado!")
+                    
+                    salvar_df(df_grupos, ARQUIVO_GRUPOS)
+                    st.rerun()
+
+        st.write("**Grupos Cadastrados:**")
+        st.dataframe(df_grupos, use_container_width=True, hide_index=True)
+
+    with col_admin2:
+        st.subheader("👥 Cadastrar Gestores das Cantinas")
+        df_usr = carregar_df(ARQUIVO_USUARIOS)
+        
+        with st.form("form_novo_usuario"):
+            novo_usr = st.text_input("Usuário")
+            nova_pwd = st.text_input("Senha")
+            nova_role = st.selectbox("Papel", ["Gestor", "SuperAdmin"])
+            novo_grp_usr = st.selectbox("Pertence ao Grupo:", ["TODOS"] + lista_de_grupos)
+
+            if st.form_submit_button("Cadastrar Gestor"):
+                if novo_usr and nova_pwd:
+                    u_dict = {"Usuario": novo_usr.strip(), "Senha": nova_pwd.strip(), "Role": nova_role, "Grupo_ID": novo_grp_usr}
+                    salvar_df(pd.concat([df_usr, pd.DataFrame([u_dict])], ignore_index=True), ARQUIVO_USUARIOS)
+                    st.success("Gestor cadastrado com sucesso!")
+                    st.rerun()
+                else:
+                    st.warning("Preencha usuário e senha.")
+
+        st.write("**Gestores Cadastrados:**")
+        st.dataframe(df_usr[["Usuario", "Role", "Grupo_ID"]], use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.subheader("📊 Faturamento Consolidado de Todos os Ministérios")
+    df_vendas = carregar_df(ARQUIVO_VENDAS)
+    if not df_vendas.empty:
+        resumo = df_vendas.groupby("Grupo_ID")["Valor_Total"].agg(["sum", "count"]).rename(columns={"sum": "Faturamento (R$)", "count": "Qtd Vendas"})
+        st.dataframe(resumo, use_container_width=True)
