@@ -15,7 +15,7 @@ ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 ARQUIVO_USUARIOS = "usuarios.csv"
 
-URL_BASE = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
+URL_BASE = "https://cantina-mp-bypacheco.streamlit.app"
 
 # LISTA DE MINISTÉRIOS COM ILUSTRAÇÕES DE TEMÁTICA BÍBLICA E CRISTÃ
 GRUPOS_PADRAO = [
