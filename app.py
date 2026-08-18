@@ -17,27 +17,28 @@ ARQUIVO_USUARIOS = "usuarios.csv"
 
 URL_BASE = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
 
-# Lista oficial dos 12 Ministérios/Grupos com imagens temáticas padrão
+# Lista oficial dos 12 Ministérios/Grupos com ILUSTRAÇÕES e DESENHOS ANIMADOS
 GRUPOS_PADRAO = [
-    {"Grupo_ID": "Min. da Família", "Imagem_URL": "https://images.unsplash.com/photo-1511895426328-dc8714191300?w=800"},
-    {"Grupo_ID": "Min. de Jovens", "Imagem_URL": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800"},
-    {"Grupo_ID": "Min. Cura e Libertação", "Imagem_URL": "https://images.unsplash.com/photo-1507692049790-de58290a4334?w=800"},
-    {"Grupo_ID": "Min. de Empresários", "Imagem_URL": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800"},
-    {"Grupo_ID": "Min. de Homens", "Imagem_URL": "https://images.unsplash.com/photo-1480455624313-e29b44bbfde1?w=800"},
-    {"Grupo_ID": "Min. das Mulheres", "Imagem_URL": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800"},
-    {"Grupo_ID": "Min. da Melhor idade", "Imagem_URL": "https://images.unsplash.com/photo-1581579438747-1dc8d1e05fec?w=800"},
-    {"Grupo_ID": "Min. de Juniores", "Imagem_URL": "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?w=800"},
-    {"Grupo_ID": "Min. das Crianças", "Imagem_URL": "https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=800"},
-    {"Grupo_ID": "Instruir Para Crescer", "Imagem_URL": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800"},
-    {"Grupo_ID": "Min. de Dança", "Imagem_URL": "https://images.unsplash.com/photo-1518834107812-67b0b7c58434?w=800"},
-    {"Grupo_ID": "Min. de Louvor", "Imagem_URL": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800"},
+    {"Grupo_ID": "Min. da Família", "Imagem_URL": "https://img.freepik.com/vetores-gratis/ilustracao-de-familia-desenhada-a-mao_23-2148924040.jpg?w=800"},
+    {"Grupo_ID": "Min. de Jovens", "Imagem_URL": "https://img.freepik.com/vetores-gratis/grupo-de-jovens-felizes-se-divertindo-juntos-estilo-cartoon-ilustracao-vetorial_1150-50293.jpg?w=800"},
+    {"Grupo_ID": "Min. Cura e Libertação", "Imagem_URL": "https://img.freepik.com/vetores-gratis/ilustracao-do-conceito-de-cura-e-esperanca-desenhada-a-mao_23-2149171732.jpg?w=800"},
+    {"Grupo_ID": "Min. de Empresários", "Imagem_URL": "https://img.freepik.com/vetores-gratis/equipe-de-negocios-vitoriosa-celebrando-o-sucesso_74855-7071.jpg?w=800"},
+    {"Grupo_ID": "Min. de Homens", "Imagem_URL": "https://img.freepik.com/vetores-gratis/grupo-de-homens-amigos-sorrindo-e-conversando-estilo-desenho-animado_1150-50300.jpg?w=800"},
+    {"Grupo_ID": "Min. das Mulheres", "Imagem_URL": "https://img.freepik.com/vetores-gratis/grupo-de-mulheres-diversas-e-empoderadas-ilustracao-vetorial_1150-50285.jpg?w=800"},
+    # Imagem divertida de idosos ativos/animados
+    {"Grupo_ID": "Min. da Melhor idade", "Imagem_URL": "https://img.freepik.com/vetores-gratis/casal-de-idosos-divertido-dancando-e-se-divertindo_74855-10777.jpg?w=800"},
+    {"Grupo_ID": "Min. de Juniores", "Imagem_URL": "https://img.freepik.com/vetores-gratis/grupo-de-pre-adolescentes-felizes-se-divertindo_74855-6302.jpg?w=800"},
+    {"Grupo_ID": "Min. das Crianças", "Imagem_URL": "https://img.freepik.com/vetores-gratis/criancas-felizes-brincando-juntas-desenho-animado_1150-50278.jpg?w=800"},
+    {"Grupo_ID": "Instruir Para Crescer", "Imagem_URL": "https://img.freepik.com/vetores-gratis/professor-e-alunos-estudando-juntos-ilustracao-de-desenho-animado_1150-50290.jpg?w=800"},
+    {"Grupo_ID": "Min. de Dança", "Imagem_URL": "https://img.freepik.com/vetores-gratis/dancarinos-em-acao-ilustracao-colorida-em-desenho-animado_1150-50280.jpg?w=800"},
+    {"Grupo_ID": "Min. de Louvor", "Imagem_URL": "https://img.freepik.com/vetores-gratis/banda-de-musica-tocando-e-cantando-desenho-animado_1150-50295.jpg?w=800"},
 ]
 
 # --- INICIALIZAÇÃO SEGURA DOS DADOS ---
 
 def inicializar_arquivos():
-    if not os.path.exists(ARQUIVO_GRUPOS):
-        pd.DataFrame(GRUPOS_PADRAO).to_csv(ARQUIVO_GRUPOS, index=False)
+    # Atualiza a tabela de grupos com as novas imagens desenhadas/animadas
+    pd.DataFrame(GRUPOS_PADRAO).to_csv(ARQUIVO_GRUPOS, index=False)
 
     if not os.path.exists(ARQUIVO_USUARIOS):
         df_usr = pd.DataFrame([
@@ -108,15 +109,14 @@ else:
 
 st.title("🍔 Gestão da Cantina")
 
-# --- CARREGAMENTO E TRATAMENTO DOS DADOS DE GRUPOS E ESTOQUE ---
+# --- TRATAMENTO DOS DADOS ---
 
 df_grupos = carregar_df(ARQUIVO_GRUPOS)
 df_estoque = carregar_df(ARQUIVO_ESTOQUE)
 df_pedidos = carregar_df(ARQUIVO_PEDIDOS)
 
-# Garantia contra KeyError nas colunas essenciais
 if "Imagem_URL" not in df_grupos.columns:
-    df_grupos["Imagem_URL"] = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800"
+    df_grupos["Imagem_URL"] = "https://img.freepik.com/vetores-gratis/ilustracao-de-comida-desenhada-a-mao_23-2148924040.jpg?w=800"
     salvar_df(df_grupos, ARQUIVO_GRUPOS)
 
 if "Grupo_ID" not in df_estoque.columns:
@@ -158,7 +158,7 @@ st.divider()
 if modo == "📱 Cardápio (Cliente)":
     if grupo_ativo != "TODOS":
         info_grupo = df_grupos[df_grupos["Grupo_ID"] == grupo_ativo]
-        url_imagem = info_grupo["Imagem_URL"].values[0] if not info_grupo.empty else "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800"
+        url_imagem = info_grupo["Imagem_URL"].values[0] if not info_grupo.empty else "https://img.freepik.com/vetores-gratis/ilustracao-de-comida-desenhada-a-mao_23-2148924040.jpg?w=800"
         
         col_img, col_tit = st.columns([1, 3])
         with col_img:
@@ -369,7 +369,7 @@ elif modo == "👑 Administração Geral":
         st.subheader("🏢 Cadastrar / Editar Grupos & Imagens")
         with st.form("form_novo_grupo"):
             novo_grupo_nome = st.text_input("Nome do Grupo / Ministério")
-            nova_img_url = st.text_input("URL da Imagem (Link)", value="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800")
+            nova_img_url = st.text_input("URL da Imagem (Link)", value="https://img.freepik.com/vetores-gratis/ilustracao-de-comida-desenhada-a-mao_23-2148924040.jpg?w=800")
             
             if st.form_submit_button("Salvar Grupo / Imagem"):
                 if novo_grupo_nome.strip():
