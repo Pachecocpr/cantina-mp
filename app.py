@@ -15,29 +15,28 @@ ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 ARQUIVO_USUARIOS = "usuarios.csv"
 
-URL_BASE = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
+URL_BASE = "https://cantina-mp-bypacheco.streamlit.app/"
 
-# Lista oficial dos 12 Ministérios/Grupos com ILUSTRAÇÕES e DESENHOS ANIMADOS
+# Lista de Ministérios com Ilustrações e Temática Cristã
 GRUPOS_PADRAO = [
-    {"Grupo_ID": "Min. da Família", "Imagem_URL": "https://img.freepik.com/vetores-gratis/ilustracao-de-familia-desenhada-a-mao_23-2148924040.jpg?w=800"},
-    {"Grupo_ID": "Min. de Jovens", "Imagem_URL": "https://img.freepik.com/vetores-gratis/grupo-de-jovens-felizes-se-divertindo-juntos-estilo-cartoon-ilustracao-vetorial_1150-50293.jpg?w=800"},
-    {"Grupo_ID": "Min. Cura e Libertação", "Imagem_URL": "https://img.freepik.com/vetores-gratis/ilustracao-do-conceito-de-cura-e-esperanca-desenhada-a-mao_23-2149171732.jpg?w=800"},
-    {"Grupo_ID": "Min. de Empresários", "Imagem_URL": "https://img.freepik.com/vetores-gratis/equipe-de-negocios-vitoriosa-celebrando-o-sucesso_74855-7071.jpg?w=800"},
-    {"Grupo_ID": "Min. de Homens", "Imagem_URL": "https://img.freepik.com/vetores-gratis/grupo-de-homens-amigos-sorrindo-e-conversando-estilo-desenho-animado_1150-50300.jpg?w=800"},
-    {"Grupo_ID": "Min. das Mulheres", "Imagem_URL": "https://img.freepik.com/vetores-gratis/grupo-de-mulheres-diversas-e-empoderadas-ilustracao-vetorial_1150-50285.jpg?w=800"},
-    # Imagem divertida de idosos ativos/animados
-    {"Grupo_ID": "Min. da Melhor idade", "Imagem_URL": "https://img.freepik.com/vetores-gratis/casal-de-idosos-divertido-dancando-e-se-divertindo_74855-10777.jpg?w=800"},
-    {"Grupo_ID": "Min. de Juniores", "Imagem_URL": "https://img.freepik.com/vetores-gratis/grupo-de-pre-adolescentes-felizes-se-divertindo_74855-6302.jpg?w=800"},
-    {"Grupo_ID": "Min. das Crianças", "Imagem_URL": "https://img.freepik.com/vetores-gratis/criancas-felizes-brincando-juntas-desenho-animado_1150-50278.jpg?w=800"},
-    {"Grupo_ID": "Instruir Para Crescer", "Imagem_URL": "https://img.freepik.com/vetores-gratis/professor-e-alunos-estudando-juntos-ilustracao-de-desenho-animado_1150-50290.jpg?w=800"},
-    {"Grupo_ID": "Min. de Dança", "Imagem_URL": "https://img.freepik.com/vetores-gratis/dancarinos-em-acao-ilustracao-colorida-em-desenho-animado_1150-50280.jpg?w=800"},
-    {"Grupo_ID": "Min. de Louvor", "Imagem_URL": "https://img.freepik.com/vetores-gratis/banda-de-musica-tocando-e-cantando-desenho-animado_1150-50295.jpg?w=800"},
+    {"Grupo_ID": "Min. da Família", "Imagem_URL": "https://img.freepik.com/vetores-gratis/ilustracao-de-familia-orando-e-unida-conceito-cristao_23-2149150012.jpg?w=800"},
+    {"Grupo_ID": "Min. de Jovens", "Imagem_URL": "https://img.freepik.com/vetores-gratis/jovens-com-biblia-e-cruz-conceito-cristao-de-juventude_23-2149150015.jpg?w=800"},
+    {"Grupo_ID": "Min. Cura e Libertação", "Imagem_URL": "https://img.freepik.com/vetores-gratis/maos-em-oracao-com-luz-divina-e-cruz-simbolo-de-fe_23-2149150020.jpg?w=800"},
+    {"Grupo_ID": "Min. de Empresários", "Imagem_URL": "https://img.freepik.com/vetores-gratis/homem-de-negocios-orando-com-biblia-na-mesa-trabalho-cristao_23-2149150025.jpg?w=800"},
+    {"Grupo_ID": "Min. de Homens", "Imagem_URL": "https://img.freepik.com/vetores-gratis/homens-em-circulo-de-oracao-e-estudo-da-biblia_23-2149150030.jpg?w=800"},
+    {"Grupo_ID": "Min. das Mulheres", "Imagem_URL": "https://img.freepik.com/vetores-gratis/mulheres-orando-juntas-com-biblia-e-flores-conceito-cristao_23-2149150035.jpg?w=800"},
+    {"Grupo_ID": "Min. da Melhor idade", "Imagem_URL": "https://img.freepik.com/vetores-gratis/casal-de-idosos-sorridentes-orando-com-biblia-na-mao-estilo-desenho-animado_23-2149150040.jpg?w=800"},
+    {"Grupo_ID": "Min. de Juniores", "Imagem_URL": "https://img.freepik.com/vetores-gratis/crianças-e-pré-adolescentes-na-escola-dominical-com-biblia_23-2149150045.jpg?w=800"},
+    {"Grupo_ID": "Min. das Crianças", "Imagem_URL": "https://img.freepik.com/vetores-gratis/crianças-ouvindo-historias-da-biblia-escola-dominical_23-2149150050.jpg?w=800"},
+    {"Grupo_ID": "Instruir Para Crescer", "Imagem_URL": "https://img.freepik.com/vetores-gratis/biblia-aberta-com-luz-saindo-e-arvore-crescendo-ensino_23-2149150055.jpg?w=800"},
+    {"Grupo_ID": "Min. de Dança", "Imagem_URL": "https://img.freepik.com/vetores-gratis/dancarina-com-fitas-louvando-conceito-de-danca-crista_23-2149150060.jpg?w=800"},
+    {"Grupo_ID": "Min. de Louvor", "Imagem_URL": "https://img.freepik.com/vetores-gratis/violao-harpa-e-notas-musicais-com-cruz-louvor-e-adoracao_23-2149150065.jpg?w=800"},
 ]
 
 # --- INICIALIZAÇÃO SEGURA DOS DADOS ---
 
 def inicializar_arquivos():
-    # Atualiza a tabela de grupos com as novas imagens desenhadas/animadas
+    # Sobrescreve/Atualiza o CSV com as novas imagens temáticas cristãs
     pd.DataFrame(GRUPOS_PADRAO).to_csv(ARQUIVO_GRUPOS, index=False)
 
     if not os.path.exists(ARQUIVO_USUARIOS):
@@ -107,7 +106,7 @@ else:
         st.session_state.grupo_id = None
         st.rerun()
 
-st.title("🍔 Gestão da Cantina")
+st.title("🍔 CANTINA MP - GETSEMANI")
 
 # --- TRATAMENTO DOS DADOS ---
 
@@ -116,7 +115,7 @@ df_estoque = carregar_df(ARQUIVO_ESTOQUE)
 df_pedidos = carregar_df(ARQUIVO_PEDIDOS)
 
 if "Imagem_URL" not in df_grupos.columns:
-    df_grupos["Imagem_URL"] = "https://img.freepik.com/vetores-gratis/ilustracao-de-comida-desenhada-a-mao_23-2148924040.jpg?w=800"
+    df_grupos["Imagem_URL"] = "https://img.freepik.com/vetores-gratis/biblia-aberta-com-luz-saindo-e-arvore-crescendo-ensino_23-2149150055.jpg?w=800"
     salvar_df(df_grupos, ARQUIVO_GRUPOS)
 
 if "Grupo_ID" not in df_estoque.columns:
@@ -158,7 +157,7 @@ st.divider()
 if modo == "📱 Cardápio (Cliente)":
     if grupo_ativo != "TODOS":
         info_grupo = df_grupos[df_grupos["Grupo_ID"] == grupo_ativo]
-        url_imagem = info_grupo["Imagem_URL"].values[0] if not info_grupo.empty else "https://img.freepik.com/vetores-gratis/ilustracao-de-comida-desenhada-a-mao_23-2148924040.jpg?w=800"
+        url_imagem = info_grupo["Imagem_URL"].values[0] if not info_grupo.empty else "https://img.freepik.com/vetores-gratis/biblia-aberta-com-luz-saindo-e-arvore-crescendo-ensino_23-2149150055.jpg?w=800"
         
         col_img, col_tit = st.columns([1, 3])
         with col_img:
@@ -369,7 +368,7 @@ elif modo == "👑 Administração Geral":
         st.subheader("🏢 Cadastrar / Editar Grupos & Imagens")
         with st.form("form_novo_grupo"):
             novo_grupo_nome = st.text_input("Nome do Grupo / Ministério")
-            nova_img_url = st.text_input("URL da Imagem (Link)", value="https://img.freepik.com/vetores-gratis/ilustracao-de-comida-desenhada-a-mao_23-2148924040.jpg?w=800")
+            nova_img_url = st.text_input("URL da Imagem (Link)", value="https://img.freepik.com/vetores-gratis/biblia-aberta-com-luz-saindo-e-arvore-crescendo-ensino_23-2149150055.jpg?w=800")
             
             if st.form_submit_button("Salvar Grupo / Imagem"):
                 if novo_grupo_nome.strip():
