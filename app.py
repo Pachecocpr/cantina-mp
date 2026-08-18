@@ -33,27 +33,25 @@ GRUPOS_PADRAO = [
     {"Grupo_ID": "Min. de Louvor", "Imagem_URL": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800"},
 ]
 
-# --- INICIALIZAÇÃO DOS DADOS ---
+# --- INICIALIZAÇÃO SEGURA DOS DADOS ---
 
 def inicializar_arquivos():
-    # 1. Cria a tabela de grupos com as imagens padrão
     if not os.path.exists(ARQUIVO_GRUPOS):
         pd.DataFrame(GRUPOS_PADRAO).to_csv(ARQUIVO_GRUPOS, index=False)
 
-    # 2. Cria o Admin do sistema
     if not os.path.exists(ARQUIVO_USUARIOS):
         df_usr = pd.DataFrame([
             {"Usuario": "admin", "Senha": "123", "Role": "SuperAdmin", "Grupo_ID": "TODOS"}
         ])
         df_usr.to_csv(ARQUIVO_USUARIOS, index=False)
 
-    if not os.path.exists(ARQUIVO_ESTOQUE):
+    if not os.path.exists(ARQUIVO_ESTOQUE) or os.path.getsize(ARQUIVO_ESTOQUE) == 0:
         pd.DataFrame(columns=["Grupo_ID", "Produto", "Estoque", "Minimo_Recomendado", "Preco"]).to_csv(ARQUIVO_ESTOQUE, index=False)
 
-    if not os.path.exists(ARQUIVO_VENDAS):
+    if not os.path.exists(ARQUIVO_VENDAS) or os.path.getsize(ARQUIVO_VENDAS) == 0:
         pd.DataFrame(columns=["Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento"]).to_csv(ARQUIVO_VENDAS, index=False)
 
-    if not os.path.exists(ARQUIVO_PEDIDOS):
+    if not os.path.exists(ARQUIVO_PEDIDOS) or os.path.getsize(ARQUIVO_PEDIDOS) == 0:
         pd.DataFrame(columns=["ID", "Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento", "Status"]).to_csv(ARQUIVO_PEDIDOS, index=False)
 
 inicializar_arquivos()
@@ -110,14 +108,24 @@ else:
 
 st.title("🍔 Gestão da Cantina")
 
-# --- CARREGAMENTO DOS GRUPOS E IMAGENS ---
+# --- CARREGAMENTO E TRATAMENTO DOS DADOS DE GRUPOS E ESTOQUE ---
 
 df_grupos = carregar_df(ARQUIVO_GRUPOS)
+df_estoque = carregar_df(ARQUIVO_ESTOQUE)
+df_pedidos = carregar_df(ARQUIVO_PEDIDOS)
 
-# Garante que a coluna Imagem_URL exista
+# Garantia contra KeyError nas colunas essenciais
 if "Imagem_URL" not in df_grupos.columns:
     df_grupos["Imagem_URL"] = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800"
     salvar_df(df_grupos, ARQUIVO_GRUPOS)
+
+if "Grupo_ID" not in df_estoque.columns:
+    df_estoque = pd.DataFrame(columns=["Grupo_ID", "Produto", "Estoque", "Minimo_Recomendado", "Preco"])
+    salvar_df(df_estoque, ARQUIVO_ESTOQUE)
+
+if "Grupo_ID" not in df_pedidos.columns:
+    df_pedidos = pd.DataFrame(columns=["ID", "Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento", "Status"])
+    salvar_df(df_pedidos, ARQUIVO_PEDIDOS)
 
 lista_de_grupos = df_grupos["Grupo_ID"].tolist() if not df_grupos.empty else []
 
@@ -136,7 +144,7 @@ else:
     else:
         grupo_ativo = st.sidebar.selectbox("Escolha o Ministério / Grupo:", lista_de_grupos)
 
-# --- NAVEGAÇÃO COMPATÍVEL COM PERMISSÕES ---
+# --- NAVEGAÇÃO COMPATÍVEL ---
 opcoes_menu = ["📱 Cardápio (Cliente)"]
 if st.session_state.role in ["Gestor", "SuperAdmin"]:
     opcoes_menu.extend(["🔔 Pedidos Recebidos", "🛒 Venda Balcão", "⚙️ Gestão de Estoque", "📊 Histórico de Vendas", "📲 Gerar QR Code"])
@@ -148,14 +156,12 @@ st.divider()
 
 # --- VISÃO 1: CARDÁPIO DO CLIENTE ---
 if modo == "📱 Cardápio (Cliente)":
-    # Exibe o Título com a Imagem do Grupo no Cardápio Principal
     if grupo_ativo != "TODOS":
         info_grupo = df_grupos[df_grupos["Grupo_ID"] == grupo_ativo]
         url_imagem = info_grupo["Imagem_URL"].values[0] if not info_grupo.empty else "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800"
         
         col_img, col_tit = st.columns([1, 3])
         with col_img:
-            # CORREÇÃO AQUI: use_container_width em vez de use_column_width
             st.image(url_imagem, use_container_width=True)
         with col_tit:
             st.title(f"✨ {grupo_ativo}")
@@ -163,9 +169,6 @@ if modo == "📱 Cardápio (Cliente)":
             st.caption("Faça seu pedido abaixo para ser preparado pela equipe.")
     else:
         st.header("📱 Cardápio Digital - Visão Geral")
-
-    df_estoque = carregar_df(ARQUIVO_ESTOQUE)
-    df_pedidos = carregar_df(ARQUIVO_PEDIDOS)
 
     df_estoque_grp = df_estoque[df_estoque["Grupo_ID"] == grupo_ativo] if not df_estoque.empty else pd.DataFrame()
     df_pedidos_grp = df_pedidos[(df_pedidos["Grupo_ID"] == grupo_ativo) & (df_pedidos["Status"] == "Pendente")] if not df_pedidos.empty else pd.DataFrame()
@@ -227,8 +230,6 @@ if modo == "📱 Cardápio (Cliente)":
 # --- VISÃO 2: PEDIDOS RECEBIDOS ---
 elif modo == "🔔 Pedidos Recebidos":
     st.header(f"🔔 Pedidos Recebidos - {grupo_ativo}")
-    df_pedidos = carregar_df(ARQUIVO_PEDIDOS)
-    df_estoque = carregar_df(ARQUIVO_ESTOQUE)
     df_vendas = carregar_df(ARQUIVO_VENDAS)
 
     filtro_pedidos = df_pedidos if grupo_ativo == "TODOS" else df_pedidos[df_pedidos["Grupo_ID"] == grupo_ativo]
@@ -272,7 +273,6 @@ elif modo == "🛒 Venda Balcão":
     if grupo_ativo == "TODOS":
         st.warning("Selecione um grupo específico na barra lateral.")
     else:
-        df_estoque = carregar_df(ARQUIVO_ESTOQUE)
         df_vendas = carregar_df(ARQUIVO_VENDAS)
         df_est_grp = df_estoque[df_estoque["Grupo_ID"] == grupo_ativo] if not df_estoque.empty else pd.DataFrame()
 
@@ -315,7 +315,6 @@ elif modo == "⚙️ Gestão de Estoque":
     if grupo_ativo == "TODOS":
         st.warning("Selecione um grupo específico na barra lateral.")
     else:
-        df_estoque = carregar_df(ARQUIVO_ESTOQUE)
         with st.form("form_prod"):
             nome = st.text_input("Nome do Produto")
             qtd = st.number_input("Estoque", min_value=0, value=10)
