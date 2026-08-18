@@ -15,7 +15,7 @@ ARQUIVO_VENDAS = "historico_vendas.csv"
 ARQUIVO_PEDIDOS = "pedidos_pendentes.csv"
 ARQUIVO_USUARIOS = "usuarios.csv"
 
-URL_BASE = "https://cantina-mp-bypacheco.streamlit.app"
+URL_BASE = "https://cantina-mp-qpwibpbbdhxh85b23yopiy.streamlit.app"
 
 # LISTA DE MINISTÉRIOS COM ILUSTRAÇÕES DE TEMÁTICA BÍBLICA E CRISTÃ
 GRUPOS_PADRAO = [
@@ -45,7 +45,12 @@ GRUPOS_PADRAO = [
     {"Grupo_ID": "Min. de Louvor", "Imagem_URL": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTq_6iq7oqbRXBDCH4AvmPJGmYEyamUflv-5itvcQzDbQ&s=10"},
 
 ]
-# --- INICIALIZAÇÃO DE DADOS E CRIAÇÃO DO ADMIN ---
+
+COLUNAS_VENDAS = ["Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento"]
+COLUNAS_ESTOQUE = ["Grupo_ID", "Produto", "Estoque", "Minimo_Recomendado", "Preco"]
+COLUNAS_PEDIDOS = ["ID", "Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento", "Status"]
+
+# --- INICIALIZAÇÃO DE DADOS ---
 
 def inicializar_arquivos():
     pd.DataFrame(GRUPOS_PADRAO).to_csv(ARQUIVO_GRUPOS, index=False)
@@ -57,26 +62,38 @@ def inicializar_arquivos():
     if not os.path.exists(ARQUIVO_USUARIOS) or os.path.getsize(ARQUIVO_USUARIOS) == 0:
         df_usr_padrao.to_csv(ARQUIVO_USUARIOS, index=False)
     else:
-        df_existente = pd.read_csv(ARQUIVO_USUARIOS)
-        if df_existente[df_existente["Usuario"] == "admin"].empty:
-            df_unificado = pd.concat([df_existente, df_usr_padrao], ignore_index=True)
-            df_unificado.to_csv(ARQUIVO_USUARIOS, index=False)
+        try:
+            df_existente = pd.read_csv(ARQUIVO_USUARIOS)
+            if df_existente.empty or "Usuario" not in df_existente.columns or df_existente[df_existente["Usuario"] == "admin"].empty:
+                df_unificado = pd.concat([df_existente, df_usr_padrao], ignore_index=True)
+                df_unificado.to_csv(ARQUIVO_USUARIOS, index=False)
+        except Exception:
+            df_usr_padrao.to_csv(ARQUIVO_USUARIOS, index=False)
 
     if not os.path.exists(ARQUIVO_ESTOQUE) or os.path.getsize(ARQUIVO_ESTOQUE) == 0:
-        pd.DataFrame(columns=["Grupo_ID", "Produto", "Estoque", "Minimo_Recomendado", "Preco"]).to_csv(ARQUIVO_ESTOQUE, index=False)
+        pd.DataFrame(columns=COLUNAS_ESTOQUE).to_csv(ARQUIVO_ESTOQUE, index=False)
 
     if not os.path.exists(ARQUIVO_VENDAS) or os.path.getsize(ARQUIVO_VENDAS) == 0:
-        pd.DataFrame(columns=["Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento"]).to_csv(ARQUIVO_VENDAS, index=False)
+        pd.DataFrame(columns=COLUNAS_VENDAS).to_csv(ARQUIVO_VENDAS, index=False)
 
     if not os.path.exists(ARQUIVO_PEDIDOS) or os.path.getsize(ARQUIVO_PEDIDOS) == 0:
-        pd.DataFrame(columns=["ID", "Grupo_ID", "Data_Hora", "Cliente", "Produto", "Quantidade", "Valor_Total", "Forma_Pagamento", "Status"]).to_csv(ARQUIVO_PEDIDOS, index=False)
+        pd.DataFrame(columns=COLUNAS_PEDIDOS).to_csv(ARQUIVO_PEDIDOS, index=False)
 
 inicializar_arquivos()
 
 # --- FUNÇÕES AUXILIARES ---
 
-def carregar_df(caminho):
-    return pd.read_csv(caminho) if os.path.exists(caminho) else pd.DataFrame()
+def carregar_df(caminho, colunas_padrao):
+    if os.path.exists(caminho) and os.path.getsize(caminho) > 0:
+        try:
+            df = pd.read_csv(caminho)
+            for col in colunas_padrao:
+                if col not in df.columns:
+                    df[col] = None
+            return df
+        except Exception:
+            return pd.DataFrame(columns=colunas_padrao)
+    return pd.DataFrame(columns=colunas_padrao)
 
 def salvar_df(df, caminho):
     df.to_csv(caminho, index=False)
@@ -99,7 +116,7 @@ if "usuario_logado" not in st.session_state:
 
 st.sidebar.title("🔐 Login de Gestão")
 
-df_usuarios = carregar_df(ARQUIVO_USUARIOS)
+df_usuarios = pd.read_csv(ARQUIVO_USUARIOS) if os.path.exists(ARQUIVO_USUARIOS) else pd.DataFrame()
 
 if st.session_state.usuario_logado is None:
     with st.sidebar.expander("Acesso para Gestores e Admin", expanded=True):
@@ -108,16 +125,19 @@ if st.session_state.usuario_logado is None:
         if st.button("Entrar", type="primary"):
             u_clean = str(user_input).strip()
             p_clean = str(pass_input).strip()
-            usr_match = df_usuarios[(df_usuarios["Usuario"].astype(str) == u_clean) & (df_usuarios["Senha"].astype(str) == p_clean)]
             
-            if not usr_match.empty:
-                info_usr = usr_match.iloc[0]
-                st.session_state.usuario_logado = info_usr["Usuario"]
-                st.session_state.role = info_usr["Role"]
-                st.session_state.grupo_id = info_usr["Grupo_ID"]
-                st.rerun()
+            if not df_usuarios.empty and "Usuario" in df_usuarios.columns:
+                usr_match = df_usuarios[(df_usuarios["Usuario"].astype(str) == u_clean) & (df_usuarios["Senha"].astype(str) == p_clean)]
+                if not usr_match.empty:
+                    info_usr = usr_match.iloc[0]
+                    st.session_state.usuario_logado = info_usr["Usuario"]
+                    st.session_state.role = info_usr["Role"]
+                    st.session_state.grupo_id = info_usr["Grupo_ID"]
+                    st.rerun()
+                else:
+                    st.sidebar.error("Usuário ou senha inválidos.")
             else:
-                st.sidebar.error("Usuário ou senha inválidos.")
+                st.sidebar.error("Base de usuários indisponível.")
 else:
     st.sidebar.info(f"👤 **{st.session_state.usuario_logado}** ({st.session_state.role})")
     if st.button("Sair (Logout)"):
@@ -126,15 +146,15 @@ else:
         st.session_state.grupo_id = None
         st.rerun()
 
-st.title("✝️ Cantina dos Ministérios")
+st.title("🍔 Cantina dos Ministérios")
 
 # --- TRATAMENTO DOS DADOS ---
 
-df_grupos = carregar_df(ARQUIVO_GRUPOS)
-df_estoque = carregar_df(ARQUIVO_ESTOQUE)
-df_pedidos = carregar_df(ARQUIVO_PEDIDOS)
+df_grupos = pd.read_csv(ARQUIVO_GRUPOS) if os.path.exists(ARQUIVO_GRUPOS) else pd.DataFrame()
+df_estoque = carregar_df(ARQUIVO_ESTOQUE, COLUNAS_ESTOQUE)
+df_pedidos = carregar_df(ARQUIVO_PEDIDOS, COLUNAS_PEDIDOS)
 
-lista_de_grupos = df_grupos["Grupo_ID"].tolist() if not df_grupos.empty else []
+lista_de_grupos = df_grupos["Grupo_ID"].tolist() if not df_grupos.empty and "Grupo_ID" in df_grupos.columns else []
 
 if st.session_state.role == "SuperAdmin":
     st.sidebar.subheader("👑 Painel Admin")
@@ -151,7 +171,7 @@ else:
     else:
         grupo_ativo = st.sidebar.selectbox("Escolha o Ministério / Grupo:", lista_de_grupos)
 
-# --- NAVEGAÇÃO COMPATÍVEL ---
+# --- NAVEGAÇÃO ---
 opcoes_menu = ["📱 Cardápio (Cliente)"]
 if st.session_state.role in ["Gestor", "SuperAdmin"]:
     opcoes_menu.extend(["🔔 Pedidos Recebidos", "🛒 Venda Balcão", "⚙️ Gestão de Estoque", "📊 Histórico de Vendas", "📲 Gerar QR Code"])
@@ -164,8 +184,8 @@ st.divider()
 # --- VISÃO 1: CARDÁPIO DO CLIENTE ---
 if modo == "📱 Cardápio (Cliente)":
     if grupo_ativo != "TODOS":
-        info_grupo = df_grupos[df_grupos["Grupo_ID"] == grupo_ativo]
-        url_imagem = info_grupo["Imagem_URL"].values[0] if not info_grupo.empty else "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80"
+        info_grupo = df_grupos[df_grupos["Grupo_ID"] == grupo_ativo] if not df_grupos.empty else pd.DataFrame()
+        url_imagem = info_grupo["Imagem_URL"].values[0] if not info_grupo.empty and "Imagem_URL" in info_grupo.columns else "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80"
         
         col_img, col_tit = st.columns([1, 3])
         with col_img:
@@ -237,7 +257,7 @@ if modo == "📱 Cardápio (Cliente)":
 # --- VISÃO 2: PEDIDOS RECEBIDOS ---
 elif modo == "🔔 Pedidos Recebidos":
     st.header(f"🔔 Pedidos Recebidos - {grupo_ativo}")
-    df_vendas = carregar_df(ARQUIVO_VENDAS)
+    df_vendas = carregar_df(ARQUIVO_VENDAS, COLUNAS_VENDAS)
 
     filtro_pedidos = df_pedidos if grupo_ativo == "TODOS" else df_pedidos[df_pedidos["Grupo_ID"] == grupo_ativo]
     pendentes = filtro_pedidos[filtro_pedidos["Status"] == "Pendente"] if not filtro_pedidos.empty else pd.DataFrame()
@@ -280,7 +300,7 @@ elif modo == "🛒 Venda Balcão":
     if grupo_ativo == "TODOS":
         st.warning("Selecione um grupo específico na barra lateral.")
     else:
-        df_vendas = carregar_df(ARQUIVO_VENDAS)
+        df_vendas = carregar_df(ARQUIVO_VENDAS, COLUNAS_VENDAS)
         df_est_grp = df_estoque[df_estoque["Grupo_ID"] == grupo_ativo] if not df_estoque.empty else pd.DataFrame()
 
         if df_est_grp.empty:
@@ -316,44 +336,82 @@ elif modo == "🛒 Venda Balcão":
                 st.subheader("Estoque Local")
                 st.dataframe(df_est_grp[["Produto", "Estoque", "Preco"]], use_container_width=True)
 
-# --- VISÃO 4: GESTÃO DE ESTOQUE ---
+# --- VISÃO 4: GESTÃO DE ESTOQUE (INCLUI EDITAR E EXCLUIR) ---
 elif modo == "⚙️ Gestão de Estoque":
     st.header(f"⚙️ Gestão de Estoque - {grupo_ativo}")
     if grupo_ativo == "TODOS":
         st.warning("Selecione um grupo específico na barra lateral.")
     else:
-        with st.form("form_prod"):
-            nome = st.text_input("Nome do Produto")
-            qtd = st.number_input("Estoque", min_value=0, value=10)
-            minimo = st.number_input("Estoque Mínimo", min_value=0, value=5)
-            preco = st.number_input("Preço (R$)", min_value=0.0, value=5.00)
+        df_est_grp = df_estoque[df_estoque["Grupo_ID"] == grupo_ativo]
+        
+        acao_estoque = st.radio("Selecione a Ação:", ["➕ Adicionar / Editar Produto", "🗑️ Excluir Produto"], horizontal=True)
 
-            if st.form_submit_button("Salvar / Atualizar Produto"):
-                if nome.strip():
-                    nome_limpo = nome.strip().capitalize()
-                    mask = (df_estoque["Grupo_ID"] == grupo_ativo) & (df_estoque["Produto"] == nome_limpo)
-                    if not df_estoque[mask].empty:
-                        df_estoque.loc[mask, ["Estoque", "Minimo_Recomendado", "Preco"]] = [qtd, minimo, preco]
+        if acao_estoque == "➕ Adicionar / Editar Produto":
+            prod_lista = ["-- Novo Produto --"] + df_est_grp["Produto"].tolist() if not df_est_grp.empty else ["-- Novo Produto --"]
+            prod_selecionado = st.selectbox("Selecione um produto para editar ou cadastre um novo:", prod_lista)
+
+            val_nome = ""
+            val_qtd = 10
+            val_min = 5
+            val_preco = 5.00
+
+            if prod_selecionado != "-- Novo Produto --":
+                dados_prod = df_est_grp[df_est_grp["Produto"] == prod_selecionado].iloc[0]
+                val_nome = str(dados_prod["Produto"])
+                val_qtd = int(dados_prod["Estoque"])
+                val_min = int(dados_prod["Minimo_Recomendado"])
+                val_preco = float(dados_prod["Preco"])
+
+            with st.form("form_prod"):
+                nome = st.text_input("Nome do Produto", value=val_nome)
+                qtd = st.number_input("Quantidade em Estoque", min_value=0, value=val_qtd)
+                minimo = st.number_input("Estoque Mínimo Recomendado", min_value=0, value=val_min)
+                preco = st.number_input("Preço Unitário (R$)", min_value=0.0, value=val_preco, step=0.50)
+
+                if st.form_submit_button("💾 Salvar Produto", type="primary"):
+                    if nome.strip():
+                        nome_limpo = nome.strip().capitalize()
+                        mask = (df_estoque["Grupo_ID"] == grupo_ativo) & (df_estoque["Produto"] == (prod_selecionado if prod_selecionado != "-- Novo Produto --" else nome_limpo))
+                        
+                        if not df_estoque[mask].empty:
+                            df_estoque.loc[mask, ["Produto", "Estoque", "Minimo_Recomendado", "Preco"]] = [nome_limpo, qtd, minimo, preco]
+                        else:
+                            nova_linha = {"Grupo_ID": grupo_ativo, "Produto": nome_limpo, "Estoque": qtd, "Minimo_Recomendado": minimo, "Preco": preco}
+                            df_estoque = pd.concat([df_estoque, pd.DataFrame([nova_linha])], ignore_index=True)
+                            
+                        salvar_df(df_estoque, ARQUIVO_ESTOQUE)
+                        st.success("Estoque atualizado com sucesso!")
+                        st.rerun()
                     else:
-                        nova_linha = {"Grupo_ID": grupo_ativo, "Produto": nome_limpo, "Estoque": qtd, "Minimo_Recomendado": minimo, "Preco": preco}
-                        df_estoque = pd.concat([df_estoque, pd.DataFrame([nova_linha])], ignore_index=True)
+                        st.warning("Preencha o nome do produto.")
+
+        elif acao_estoque == "🗑️ Excluir Produto":
+            if df_est_grp.empty:
+                st.info("Nenhum produto disponível para exclusão neste grupo.")
+            else:
+                prod_excluir = st.selectbox("Selecione o produto a ser removido:", df_est_grp["Produto"].tolist())
+                if st.button("🗑️ Confirmar Exclusão", type="primary"):
+                    df_estoque = df_estoque[~((df_estoque["Grupo_ID"] == grupo_ativo) & (df_estoque["Produto"] == prod_excluir))]
                     salvar_df(df_estoque, ARQUIVO_ESTOQUE)
-                    st.success("Produto salvo!")
+                    st.success(f"Produto '{prod_excluir}' removido com sucesso!")
                     st.rerun()
 
-        st.dataframe(df_estoque[df_estoque["Grupo_ID"] == grupo_ativo], use_container_width=True)
+        st.divider()
+        st.subheader("📋 Estoque Atual")
+        st.dataframe(df_estoque[df_estoque["Grupo_ID"] == grupo_ativo], use_container_width=True, hide_index=True)
 
 # --- VISÃO 5: HISTÓRICO ---
 elif modo == "📊 Histórico de Vendas":
     st.header(f"📊 Histórico de Vendas - {grupo_ativo}")
-    df_vendas = carregar_df(ARQUIVO_VENDAS)
+    df_vendas = carregar_df(ARQUIVO_VENDAS, COLUNAS_VENDAS)
+    
     filtro_vendas = df_vendas if grupo_ativo == "TODOS" else df_vendas[df_vendas["Grupo_ID"] == grupo_ativo]
 
-    if not filtro_vendas.empty:
+    if not filtro_vendas.empty and "Valor_Total" in filtro_vendas.columns:
         st.metric("Faturamento Total", f"R$ {filtro_vendas['Valor_Total'].sum():.2f}")
-        st.dataframe(filtro_vendas, use_container_width=True)
+        st.dataframe(filtro_vendas, use_container_width=True, hide_index=True)
     else:
-        st.info("Nenhuma venda cadastrada.")
+        st.info("Nenhuma venda registrada para este ministério.")
 
 # --- VISÃO 6: QR CODE ---
 elif modo == "📲 Gerar QR Code":
@@ -381,7 +439,8 @@ elif modo == "👑 Administração Geral":
             if st.form_submit_button("Salvar Grupo / Imagem"):
                 if novo_grupo_nome.strip():
                     nome_formatado = novo_grupo_nome.strip()
-                    mask_grp = df_grupos["Grupo_ID"] == nome_formatado
+                    mask_grp = df_grupos["Grupo_ID"] == nome_formatado if not df_grupos.empty else pd.Series([False])
+                    
                     if mask_grp.any():
                         df_grupos.loc[mask_grp, "Imagem_URL"] = nova_img_url.strip()
                         st.success(f"Imagem do '{nome_formatado}' atualizada!")
@@ -397,7 +456,7 @@ elif modo == "👑 Administração Geral":
 
     with col_admin2:
         st.subheader("👥 Cadastrar Gestores das Cantinas")
-        df_usr = carregar_df(ARQUIVO_USUARIOS)
+        df_usr = pd.read_csv(ARQUIVO_USUARIOS) if os.path.exists(ARQUIVO_USUARIOS) else pd.DataFrame()
         
         with st.form("form_novo_usuario"):
             novo_usr = st.text_input("Usuário")
@@ -415,11 +474,14 @@ elif modo == "👑 Administração Geral":
                     st.warning("Preencha usuário e senha.")
 
         st.write("**Gestores Cadastrados:**")
-        st.dataframe(df_usr[["Usuario", "Role", "Grupo_ID"]], use_container_width=True, hide_index=True)
+        if not df_usr.empty and "Usuario" in df_usr.columns:
+            st.dataframe(df_usr[["Usuario", "Role", "Grupo_ID"]], use_container_width=True, hide_index=True)
 
     st.divider()
     st.subheader("📊 Faturamento Consolidado de Todos os Ministérios")
-    df_vendas = carregar_df(ARQUIVO_VENDAS)
-    if not df_vendas.empty:
+    df_vendas = carregar_df(ARQUIVO_VENDAS, COLUNAS_VENDAS)
+    if not df_vendas.empty and "Grupo_ID" in df_vendas.columns and "Valor_Total" in df_vendas.columns:
         resumo = df_vendas.groupby("Grupo_ID")["Valor_Total"].agg(["sum", "count"]).rename(columns={"sum": "Faturamento (R$)", "count": "Qtd Vendas"})
         st.dataframe(resumo, use_container_width=True)
+    else:
+        st.info("Nenhuma venda para consolidar até o momento.")
