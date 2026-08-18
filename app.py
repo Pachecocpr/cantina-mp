@@ -155,7 +155,8 @@ if modo == "📱 Cardápio (Cliente)":
         
         col_img, col_tit = st.columns([1, 3])
         with col_img:
-            st.image(url_imagem, use_column_width=True)
+            # CORREÇÃO AQUI: use_container_width em vez de use_column_width
+            st.image(url_imagem, use_container_width=True)
         with col_tit:
             st.title(f"✨ {grupo_ativo}")
             st.subheader("Cardápio Digital da Cantina")
